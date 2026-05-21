@@ -1,15 +1,19 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
+import uuid
+
+from fastapi.params import Depends
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer
 
 import jwt
-from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
 
 from app.core.config import settings
 
 password_hash = PasswordHash.recommended()
 
-oauth_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/token")
 
 
 def hash_password(password: str) -> str:
@@ -23,53 +27,71 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(
-    data: dict[str, Any], expires_delta: timedelta | None = None
+    *,
+    user_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    role: str,
 ) -> str:
-    """Create a JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-    to_encode.update({"exp": expire})
+    """Create a JWT access token with user and tenant information"""
 
-    encoded_jwt = jwt.encode(
-        to_encode,
+    expire = datetime.now(UTC) + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
+    payload = {
+        "sub": str(user_id),
+        "tenant_id": str(tenant_id),
+        "role": role,
+        "type": "access",
+        "exp": expire,
+    }
+
+    return jwt.encode(
+        payload,
         settings.JWT_SECRET_KEY.get_secret_value(),
         algorithm=settings.JWT_ALGORITHM,
     )
-    return str(encoded_jwt)
-
 
 def create_refresh_token(
-    data: dict[str, Any], expires_delta: timedelta | None = None
+    *,
+    user_id: uuid.UUID,
 ) -> str:
-    """Create a JWT refresh token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
+    expire = datetime.now(UTC) + timedelta(days=30)
 
-    encoded_jwt = jwt.encode(
-        to_encode,
+    payload = {
+        "sub": str(user_id),
+        "type": "refresh",
+        "exp": expire,
+    }
+
+    return jwt.encode(
+        payload,
         settings.JWT_SECRET_KEY.get_secret_value(),
         algorithm=settings.JWT_ALGORITHM,
     )
-    return str(encoded_jwt)
-
 
 def verify_access_token(token: str) -> dict[str, Any] | None:
     """Verify a JWT access token and return the data if valid"""
     try:
         payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY.get_secret_value(),
+            token, 
+            settings.JWT_SECRET_KEY.get_secret_value(), 
+            algorithms=[settings.JWT_ALGORITHM],
             options={"require": ["exp", "sub"]},
         )
-        return dict(payload)
+        return payload
+    except jwt.InvalidTokenError:
+        return None 
+    
+def verify_token(token: str) -> dict[str, Any] | None:
+    """Verify a JWT token (access or refresh) and return the data if valid"""
+    try:
+        payload = jwt.decode(
+            token, 
+            settings.JWT_SECRET_KEY.get_secret_value(), 
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"require": ["exp", "sub"]},
+        )
+        return payload
     except jwt.InvalidTokenError:
         return None

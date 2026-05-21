@@ -63,13 +63,44 @@ class Login(BaseModel):
     email: EmailStr
     password: str
 
-
 class Token(BaseModel):
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
 
-
+    expires_in: int
 class RefreshIn(BaseModel):
     refresh_token: str
+
+class UserBase(BaseModel):
+    username: str
+    email: EmailStr
     
+class UserMe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+
+    email: EmailStr
+    username: str
+
+    phone_number: str | None = None
+
+    is_active: bool
+    is_verified: bool
+    
+class TenantSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    
+class MembershipSummary(BaseModel):
+    tenant: TenantSummary
+    role: str
+    
+class MeResponse(UserMe):
+    memberships: list[MembershipSummary]
+    permissions: list[str]

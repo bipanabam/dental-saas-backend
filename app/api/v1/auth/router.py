@@ -1,15 +1,34 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime, timedelta, timezone as UTC
 from typing import Annotated
 
+from sqlalchemy.orm import selectinload
+
 from app.api.v1.auth.schemas import (
+    MembershipSummary,
     Register,
     RegisterTenantResponse,
+    Token,
+    RefreshIn,
+    MeResponse,
 )
 from app.api.v1.auth.service import register_tenant_service
 
 from app.core.database import get_db
+from app.core.security import (
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+)
+from app.core.dependencies.auth import CurrentUser
+from app.models.user import Membership, User
+from app.core.config import settings
+from app.models import User
 
 
 router = APIRouter(
@@ -17,7 +36,7 @@ router = APIRouter(
     tags=["auth"],
 )
 
-
+# POST -> /auth/register-tenant
 @router.post(
     "/register-tenant",
     response_model=RegisterTenantResponse,
@@ -27,7 +46,7 @@ async def register_tenant(
     payload: Register,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-
+    """Register a new tenant and its owner user account"""
     try:
         result = await register_tenant_service(
             db=db,
@@ -47,3 +66,221 @@ async def register_tenant(
             status_code=status.HTTP_409_CONFLICT,
             detail="Tenant or email already exists.",
         )
+        
+# POST -> /auth/token
+@router.post('/token', response_model=Token)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Login endpoint for JWT authentication.
+    """
+    # Find user
+    result = await db.execute(
+        select(User)
+        .options(
+            selectinload(User.memberships)
+            .selectinload(Membership.role)
+        )
+        .where(
+            func.lower(User.email) == form_data.username.lower()
+        )
+    )
+
+    user = result.scalar_one_or_none()
+
+    # Validate credentials
+    if not user or not verify_password(
+        form_data.password,
+        user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Check user status
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    # Optional email verification check
+    # if not user.is_verified:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail="Email not verified",
+    #     )
+
+    # Get active membership
+    membership = next(
+        (
+            membership
+            for membership in user.memberships
+            if membership.is_active
+        ),
+        None,
+    )
+
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No active tenant membership found",
+        )
+
+    # Create access token
+    access_token = create_access_token(
+        user_id=user.id,
+        tenant_id=membership.tenant_id,
+        role=membership.role.name,
+    )
+    # Create refresh token
+    refresh_token = create_refresh_token(
+        user_id=user.id,
+    )
+
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    
+# POST -> /auth/refresh
+@router.post(
+    "/refresh",
+    response_model=Token,
+)
+async def refresh_access_token(
+    payload: RefreshIn,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Refresh access token using a valid refresh token.
+    """
+
+    # Verify token
+    token_data = verify_token(payload.refresh_token)
+
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Ensure refresh token type
+    if token_data.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = token_data.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    # Load user and memberships
+    result = await db.execute(
+        select(User)
+        .options(
+            selectinload(User.memberships)
+            .selectinload(Membership.role)
+        )
+        .where(User.id == user_id)
+    )
+
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Validate user status
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    # Find active membership
+    membership = next(
+        (
+            membership
+            for membership in user.memberships
+            if membership.is_active
+        ),
+        None,
+    )
+
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No active tenant membership found",
+        )
+
+    # Create new access token
+    access_token = create_access_token(
+        user_id=user.id,
+        tenant_id=membership.tenant_id,
+        role=membership.role.name,
+    )
+
+    # OPTIONAL:
+    # Rotate refresh token (recommended)
+    refresh_token = create_refresh_token(
+        user_id=user.id,
+    )
+
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+# GET -> /auth/me
+@router.get(
+    "/me",
+    response_model=MeResponse,
+)
+async def me(
+    current_user: CurrentUser,
+):
+    """Get current user info, including memberships and permissions"""
+    memberships = []
+    permissions = set()
+
+    for membership in current_user.memberships:
+
+        memberships.append(
+            MembershipSummary(
+                tenant=membership.tenant,
+                role=membership.role.name,
+            )
+        )
+
+        for role_permission in membership.role.permissions:
+            permissions.add(
+                role_permission.permission.name
+            )
+
+    return MeResponse(
+        id=current_user.id,
+        email=current_user.email,
+        username=current_user.username,
+        phone_number=current_user.phone_number,
+        is_active=current_user.is_active,
+        is_verified=current_user.is_verified,
+
+        memberships=memberships,
+        permissions=sorted(list(permissions)),
+    )
