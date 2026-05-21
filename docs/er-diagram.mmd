@@ -1,323 +1,428 @@
 erDiagram
 
+  %% ─────────────────────────────────────────────
+  %% CORE TENANT & AUTH
+  %% ─────────────────────────────────────────────
+
   TENANT {
-    uuid id PK
-    string slug UK "URL-safe clinic identifier"
-    string name
-    string plan "free | starter | pro | enterprise"
-    bool is_active
-    string country
-    string timezone
-    string currency
-    timestamp created_at
-    timestamp updated_at
+    uuid        id              PK
+    string      slug            UK  "subdomain / url key"
+    string      name
+    string      plan                "BASIC | PRO | ENTERPRISE"
+    bool        is_active
+    string      timezone            "Asia/Kathmandu default"
+    string      currency            "NPR default"
+    string      logo_url
+    string      address
+    string      phone
+    string      email
+    timestamp   trial_ends_at
+    timestamp   created_at
+    timestamp   updated_at
   }
 
   USER {
-    uuid id PK
-    uuid tenant_id FK
-    string username UK
-    string hashed_password
-    string role "SUPERADMIN | ADMIN | DOCTOR | RECEPTIONIST"
-    string full_name
-    string email
-    string phone
-    string specialization
-    string nmc_reg_no
-    string photo_url
-    bool notify_appointment
-    bool notify_waiting
-    bool notify_lab_results
-    bool notify_draft_reminder
-    bool notify_daily_summary
-    bool require_otp
-    bool is_active
-    timestamp created_at
-    timestamp updated_at
+    uuid        id              PK
+    uuid        tenant_id       FK
+    string      username        UK
+    string      hashed_password
+    string      role                "SUPERADMIN | ADMIN | DOCTOR | RECEPTIONIST"
+    string      full_name
+    date        date_of_birth
+    string      phone
+    string      email
+    string      specialization
+    string      nmc_reg_no
+    string      photo_url
+    bool        is_active
+    bool        require_otp
+    bool        notify_appointment
+    bool        notify_waiting
+    bool        notify_lab_results
+    bool        notify_draft_reminder
+    bool        notify_daily_summary
+    timestamp   last_login_at
+    timestamp   created_at
+    timestamp   updated_at
   }
 
+  REFRESH_TOKEN {
+    uuid        id              PK
+    uuid        user_id         FK
+    string      token_hash
+    bool        is_revoked
+    timestamp   expires_at
+    timestamp   created_at
+  }
+
+  %% ─────────────────────────────────────────────
+  %% PATIENT & FAMILY
+  %% ─────────────────────────────────────────────
+
   PATIENT {
-    uuid id PK
-    uuid tenant_id FK
-    string patient_code UK "AUTO: TEN-00001"
-    string first_name
-    string last_name
-    string phone
-    string email
-    date date_of_birth
-    string gender
-    string blood_group
-    string allergies
-    string address
-    string status "ACTIVE | INACTIVE | BLOCKED"
-    bool is_old
-    int visit_count
-    uuid primary_account_id FK "self-ref for family"
-    string family_relation "Spouse | Child | Parent | Other"
-    timestamp last_visit_at
-    timestamp created_at
-    timestamp updated_at
+    uuid        id              PK
+    uuid        tenant_id       FK
+    string      patient_code    UK  "auto-generated e.g. BDC-00123"
+    string      first_name
+    string      last_name
+    string      phone               "unique per tenant"
+    string      email
+    date        date_of_birth
+    string      gender              "MALE | FEMALE | OTHER"
+    string      blood_group
+    string      allergies
+    string      address
+    string      status              "ACTIVE | INACTIVE | BLACKLISTED"
+    int         visit_count
+    timestamp   last_visit_at
+    uuid        primary_account_id  FK  "self-ref family link"
+    string      family_relation     "SELF | SPOUSE | CHILD | PARENT | OTHER"
+    timestamp   created_at
+    timestamp   updated_at
   }
 
   MEDICAL_RECORD {
-    uuid id PK
-    uuid patient_id FK
-    uuid assigned_doctor_id FK
-    string complaints
-    string insurance_provider
-    string insurance_no
-    string emergency_contact_name
-    string emergency_contact_no
-    string title
-    string status
-    timestamp created_at
-    timestamp updated_at
+    uuid        id              PK
+    uuid        patient_id      FK  "1:1 with patient"
+    uuid        assigned_doctor_id FK
+    string      emergency_contact_name
+    string      emergency_contact_phone
+    string      insurance_provider
+    string      insurance_number
+    string      systemic_conditions
+    string      current_medications
+    string      prior_surgeries
+    string      title
+    string      status
+    timestamp   created_at
+    timestamp   updated_at
   }
+
+  %% ─────────────────────────────────────────────
+  %% APPOINTMENTS & QUEUE
+  %% ─────────────────────────────────────────────
 
   APPOINTMENT {
-    uuid id PK
-    uuid tenant_id FK
-    uuid patient_id FK
-    uuid doctor_id FK
-    timestamp appointment_date
-    int duration_minutes
-    string status "BOOKED | CONFIRMED | IN_PROGRESS | COMPLETED | NO_SHOW | CANCELLED"
-    string type "WALKIN | BOOKED | FOLLOWUP"
-    string treatments
-    string notes
-    int queue_token
-    bool is_paid
-    float bill_amount
-    timestamp checked_in_at
-    timestamp checked_out_at
-    timestamp created_at
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        patient_id      FK
+    uuid        doctor_id       FK
+    string      appointment_type    "BOOKED | WALK_IN | FOLLOW_UP"
+    timestamp   appointment_date
+    int         duration_minutes
+    string      status              "BOOKED | CONFIRMED | IN_PROGRESS | COMPLETED | NO_SHOW | CANCELLED"
+    string      treatments
+    bool        is_paid
+    float       bill_amount
+    int         token_number
+    string      queue_status        "WAITING | IN_CHAIR | DONE"
+    string      notes
+    uuid        follow_up_from_id   FK  "links back to parent appointment"
+    timestamp   created_at
+    timestamp   updated_at
   }
+
+  QUEUE {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    date        queue_date
+    uuid        appointment_id  FK
+    int         token_number
+    string      status              "WAITING | CALLED | IN_PROGRESS | DONE | SKIPPED"
+    int         estimated_wait_mins
+    timestamp   called_at
+    timestamp   started_at
+    timestamp   completed_at
+    timestamp   created_at
+  }
+
+  %% ─────────────────────────────────────────────
+  %% CLINICAL
+  %% ─────────────────────────────────────────────
 
   DIAGNOSIS {
-    uuid id PK
-    uuid patient_id FK
-    uuid appointment_id FK
-    string current_complaint
-    string past_history
-    string medical_history
-    string current_history
-    string treatment_plan
-    string home_exercise
-    string icd10_code
-    int vas_score
-    jsonb tooth_chart "FDI notation: {11:{status,stage}, 36:{status}}"
-    string objective_data
-    string medicines
-    timestamp next_visit_date
-    timestamp created_at
-    timestamp updated_at
-  }
-
-  PROCEDURE {
-    uuid id PK
-    uuid tenant_id FK
-    uuid patient_id FK
-    uuid appointment_id FK
-    uuid billing_item_id FK
-    string name
-    string type "RCT | ORTHODONTIC | IMPLANT | CLEANING | CROWN | EXTRACTION | OTHER"
-    string description
-    float cost
-    int stage_number
-    int total_stages
-    string stage_notes
-    string status "PENDING | IN_PROGRESS | COMPLETED | CANCELLED"
-    string medicine
-    string suggestions
-    timestamp procedure_date
-    timestamp created_at
-    timestamp updated_at
+    uuid        id              PK
+    uuid        patient_id      FK
+    uuid        appointment_id  FK
+    uuid        doctor_id       FK
+    string      current_complaint
+    string      past_history
+    string      medical_history
+    string      objective_data
+    jsonb       tooth_chart         "FDI: {11:{status,stage,notes}}"
+    string      icd10_code
+    string      treatment_plan
+    string      home_exercise
+    string      medicines
+    int         vas_score
+    timestamp   next_visit_date
+    timestamp   created_at
+    timestamp   updated_at
   }
 
   TREATMENT_PLAN {
-    uuid id PK
-    uuid patient_id FK
-    uuid tenant_id FK
-    uuid created_by FK
-    string title
-    string type "RCT | ORTHODONTIC | IMPLANT | CLEANING | CROWN | BRIDGE | OTHER"
-    int total_sessions
-    int completed_sessions
-    string status "ACTIVE | COMPLETED | PAUSED | CANCELLED"
-    text notes
-    timestamp start_date
-    timestamp end_date
-    timestamp created_at
-    timestamp updated_at
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        patient_id      FK
+    uuid        doctor_id       FK
+    string      plan_type           "RCT | BRACES | IMPLANT | CROWN_BRIDGE | CLEANING | OTHER"
+    string      status              "ACTIVE | PAUSED | COMPLETED | CANCELLED"
+    int         total_sessions
+    int         completed_sessions
+    string      notes
+    timestamp   start_date
+    timestamp   expected_end_date
+    timestamp   created_at
+    timestamp   updated_at
   }
 
-  INVOICE {
-    uuid id PK
-    uuid tenant_id FK
-    uuid patient_id FK
-    uuid appointment_id FK
-    string invoice_no UK "INV-2024-00001"
-    float subtotal
-    float discount_amount
-    float discount_pct
-    float tax_amount
-    float tax_pct
-    float total
-    float amount_paid
-    float amount_due
-    string payment_status "UNPAID | PARTIAL | PAID | REFUNDED"
-    bool is_vat_invoice
-    string approved_by
-    timestamp due_date
-    timestamp created_at
-    timestamp updated_at
+  TREATMENT_SESSION {
+    uuid        id              PK
+    uuid        treatment_plan_id FK
+    uuid        appointment_id  FK
+    int         session_number
+    string      stage_label         "e.g. Impression, Fitting, Adjustment 1"
+    string      status              "PENDING | DONE | SKIPPED"
+    string      notes
+    string      doctor_remarks
+    timestamp   session_date
+    timestamp   next_session_date
+    timestamp   created_at
   }
 
-  PAYMENT {
-    uuid id PK
-    uuid invoice_id FK
-    uuid tenant_id FK
-    float amount
-    string mode "CASH | CARD | ESEWA | KHALTI | FONEPAY | BANK_TRANSFER"
-    string reference_no
-    string notes
-    timestamp paid_at
-    timestamp created_at
-  }
-
-  BILLING_CATALOG {
-    uuid id PK
-    uuid tenant_id FK
-    string name
-    string category "CONSULTATION | PROCEDURE | MEDICINE | LAB | OTHER"
-    float base_cost
-    string description
-    bool is_active
-    timestamp created_at
-    timestamp updated_at
-  }
-
-  DOCUMENT {
-    uuid id PK
-    uuid tenant_id FK
-    uuid patient_id FK
-    uuid appointment_id FK
-    uuid uploaded_by FK
-    string type "XRAY | LAB_REPORT | CONSENT | PRESCRIPTION | PHOTO_BEFORE | PHOTO_AFTER | OTHER"
-    string file_name
-    string file_url "S3 presigned key"
-    string mime_type
-    bigint file_size_bytes
-    string notes
-    timestamp created_at
+  PROCEDURE {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        patient_id      FK
+    uuid        appointment_id  FK
+    uuid        treatment_plan_id FK
+    string      name
+    string      type
+    string      description
+    float       cost
+    string      status              "PENDING | COMPLETED | BILLED"
+    string      medicine
+    string      suggestions
+    timestamp   procedure_date
+    timestamp   created_at
+    timestamp   updated_at
   }
 
   PRESCRIPTION {
-    uuid id PK
-    uuid patient_id FK
-    uuid appointment_id FK
-    uuid doctor_id FK
-    uuid tenant_id FK
-    jsonb medicines "array of {name, dosage, frequency, duration, notes}"
-    text instructions
-    timestamp prescribed_at
-    timestamp created_at
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        patient_id      FK
+    uuid        appointment_id  FK
+    uuid        doctor_id       FK
+    jsonb       medicines           "[{name,dose,frequency,duration,notes}]"
+    string      instructions
+    string      pdf_url
+    timestamp   prescribed_at
+    timestamp   created_at
   }
 
-  SMS_LOG {
-    uuid id PK
-    uuid tenant_id FK
-    uuid patient_id FK
-    string type "APPOINTMENT_REMINDER | FOLLOWUP | BIRTHDAY | DUE_PAYMENT | FEEDBACK | COMPLETION"
-    string phone_to
-    text message_body
-    string status "QUEUED | SENT | FAILED | DELIVERED"
-    string provider_ref
-    timestamp scheduled_at
-    timestamp sent_at
-    timestamp created_at
+  %% ─────────────────────────────────────────────
+  %% DOCUMENTS & FILES
+  %% ─────────────────────────────────────────────
+
+  PATIENT_DOCUMENT {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        patient_id      FK
+    uuid        appointment_id  FK
+    string      doc_type            "XRAY | LAB_REPORT | CONSENT | BEFORE_PHOTO | AFTER_PHOTO | OTHER"
+    string      file_name
+    string      s3_key
+    string      s3_url
+    string      mime_type
+    int         file_size_bytes
+    string      notes
+    timestamp   uploaded_at
+    timestamp   created_at
   }
+
+  %% ─────────────────────────────────────────────
+  %% BILLING
+  %% ─────────────────────────────────────────────
+
+  INVOICE {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        patient_id      FK
+    uuid        appointment_id  FK
+    string      invoice_number  UK
+    float       subtotal
+    float       discount_amount
+    float       tax_amount
+    float       total_amount
+    float       paid_amount
+    float       balance_due
+    string      status              "DRAFT | ISSUED | PARTIALLY_PAID | PAID | VOID"
+    bool        is_vat_invoice
+    string      notes
+    timestamp   issued_at
+    timestamp   due_date
+    timestamp   created_at
+    timestamp   updated_at
+  }
+
+  INVOICE_ITEM {
+    uuid        id              PK
+    uuid        invoice_id      FK
+    uuid        billing_catalog_id FK
+    string      description
+    float       unit_cost
+    int         quantity
+    float       discount_pct
+    float       line_total
+    timestamp   created_at
+  }
+
+  PAYMENT {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        invoice_id      FK
+    uuid        received_by     FK  "user_id"
+    float       amount
+    string      payment_mode        "CASH | CARD | ESEWA | KHALTI | BANK_TRANSFER"
+    string      reference_no
+    string      notes
+    timestamp   paid_at
+    timestamp   created_at
+  }
+
+  DISCOUNT_APPROVAL {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        invoice_id      FK
+    uuid        requested_by    FK
+    uuid        approved_by     FK
+    float       discount_pct
+    string      reason
+    string      status              "PENDING | APPROVED | REJECTED"
+    timestamp   requested_at
+    timestamp   resolved_at
+  }
+
+  BILLING_CATALOG {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    string      name
+    string      category
+    float       base_cost
+    string      description
+    bool        is_active
+    timestamp   created_at
+    timestamp   updated_at
+  }
+
+  %% ─────────────────────────────────────────────
+  %% NOTIFICATIONS
+  %% ─────────────────────────────────────────────
+
+  NOTIFICATION_LOG {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        patient_id      FK
+    string      channel             "SMS | EMAIL"
+    string      notification_type   "REMINDER | BIRTHDAY | FOLLOW_UP | DUE_PAYMENT | RECALL | REVIEW"
+    string      recipient_phone
+    string      message_body
+    string      status              "QUEUED | SENT | FAILED | DELIVERED"
+    string      provider_ref
+    string      error_message
+    timestamp   scheduled_at
+    timestamp   sent_at
+    timestamp   created_at
+  }
+
+  %% ─────────────────────────────────────────────
+  %% FEATURE FLAGS & SETTINGS
+  %% ─────────────────────────────────────────────
 
   FEATURE_FLAG {
-    uuid id PK
-    uuid tenant_id FK
-    string flag_key "sms_reminders | recall_campaign | vat_invoice | advanced_reports"
-    bool is_enabled
-    jsonb metadata "extra config per flag"
-    timestamp updated_at
-  }
-
-  AUDIT_LOG {
-    uuid id PK
-    uuid tenant_id FK
-    uuid user_id FK
-    string action "CREATE | UPDATE | DELETE | LOGIN | LOGOUT | EXPORT"
-    string module
-    string resource_id
-    jsonb before_state
-    jsonb after_state
-    string ip_address
-    timestamp created_at
+    uuid        id              PK
+    uuid        tenant_id       FK
+    string      flag_key            "e.g. sms_reminders, recall_campaigns"
+    bool        is_enabled
+    jsonb       metadata
+    timestamp   created_at
+    timestamp   updated_at
   }
 
   SYSTEM_SETTINGS {
-    uuid id PK
-    uuid tenant_id FK
-    float appointment_fee
-    int default_slot_minutes
-    string clinic_name
-    string clinic_logo_url
-    string clinic_address
-    string clinic_phone
-    string clinic_email
-    string pan_no
-    string vat_no
-    bool sms_enabled
-    string sms_provider
-    string sms_api_key
-    timestamp updated_at
+    uuid        id              PK
+    uuid        tenant_id       FK  "1:1 with tenant"
+    float       default_appointment_fee
+    int         appointment_duration_mins
+    string      clinic_open_time
+    string      clinic_close_time
+    int         reminder_lead_hours
+    int         due_reminder_days
+    string      sms_provider        "SPARROW | AAKASH"
+    string      sms_api_key
+    bool        vat_enabled
+    float       vat_percent
+    timestamp   updated_at
   }
 
-  QUEUE_TOKEN {
-    uuid id PK
-    uuid tenant_id FK
-    uuid patient_id FK
-    uuid appointment_id FK
-    int token_number
-    string status "WAITING | CALLED | IN_PROGRESS | DONE | SKIPPED"
-    date queue_date
-    timestamp called_at
-    timestamp created_at
+  AUDIT_LOG {
+    uuid        id              PK
+    uuid        tenant_id       FK
+    uuid        user_id         FK
+    string      action              "CREATE | UPDATE | DELETE | LOGIN | LOGOUT | EXPORT"
+    string      resource_type
+    uuid        resource_id
+    jsonb       diff
+    string      ip_address
+    string      user_agent
+    timestamp   created_at
   }
 
-  TENANT ||--o{ USER : "has"
-  TENANT ||--o{ PATIENT : "has"
-  TENANT ||--o{ APPOINTMENT : "has"
-  TENANT ||--o{ INVOICE : "has"
-  TENANT ||--o{ BILLING_CATALOG : "has"
-  TENANT ||--o{ FEATURE_FLAG : "has"
-  TENANT ||--o{ SYSTEM_SETTINGS : "has"
-  TENANT ||--o{ AUDIT_LOG : "has"
-  TENANT ||--o{ QUEUE_TOKEN : "has"
-  TENANT ||--o{ TREATMENT_PLAN : "has"
-  PATIENT ||--o{ APPOINTMENT : "books"
-  PATIENT ||--o{ DIAGNOSIS : "has"
-  PATIENT ||--o{ PROCEDURE : "undergoes"
-  PATIENT ||--o{ DOCUMENT : "has"
-  PATIENT ||--o{ INVOICE : "billed"
-  PATIENT ||--o{ PRESCRIPTION : "receives"
-  PATIENT ||--o{ SMS_LOG : "notified"
-  PATIENT ||--o{ TREATMENT_PLAN : "has"
-  PATIENT ||--o| MEDICAL_RECORD : "has one"
-  PATIENT ||--o{ PATIENT : "family link"
-  APPOINTMENT ||--o{ PROCEDURE : "includes"
-  APPOINTMENT ||--o{ DIAGNOSIS : "produces"
-  APPOINTMENT ||--o{ DOCUMENT : "has"
-  APPOINTMENT ||--o| INVOICE : "billed as"
-  APPOINTMENT ||--o| PRESCRIPTION : "generates"
-  APPOINTMENT ||--o| QUEUE_TOKEN : "has"
-  INVOICE ||--o{ PAYMENT : "settled by"
-  USER ||--o{ APPOINTMENT : "doctor attends"
-  USER ||--o{ PRESCRIPTION : "doctor writes"
-  USER ||--o{ AUDIT_LOG : "generates"
-  USER ||--o| MEDICAL_RECORD : "assigned to"
+  %% ─────────────────────────────────────────────
+  %% RELATIONSHIPS
+  %% ─────────────────────────────────────────────
+
+  TENANT             ||--o{ USER               : "has"
+  TENANT             ||--o{ PATIENT            : "owns"
+  TENANT             ||--o{ APPOINTMENT        : "manages"
+  TENANT             ||--o{ INVOICE            : "bills"
+  TENANT             ||--o{ BILLING_CATALOG    : "defines"
+  TENANT             ||--o{ FEATURE_FLAG       : "configures"
+  TENANT             ||--|| SYSTEM_SETTINGS    : "has one"
+  TENANT             ||--o{ AUDIT_LOG          : "tracks"
+  TENANT             ||--o{ NOTIFICATION_LOG   : "sends"
+  TENANT             ||--o{ TREATMENT_PLAN     : "tracks"
+  TENANT             ||--o{ PROCEDURE          : "records"
+
+  USER               ||--o{ APPOINTMENT        : "assigned as doctor"
+  USER               ||--o{ REFRESH_TOKEN      : "holds"
+  USER               ||--o{ AUDIT_LOG          : "generates"
+  USER               ||--o{ PAYMENT            : "receives"
+
+  PATIENT            ||--o{ APPOINTMENT        : "books"
+  PATIENT            ||--o{ DIAGNOSIS          : "receives"
+  PATIENT            ||--o{ TREATMENT_PLAN     : "has"
+  PATIENT            ||--o{ PROCEDURE          : "undergoes"
+  PATIENT            ||--o{ PATIENT_DOCUMENT   : "has"
+  PATIENT            ||--o{ INVOICE            : "billed"
+  PATIENT            ||--o{ NOTIFICATION_LOG   : "receives"
+  PATIENT            ||--o{ PRESCRIPTION       : "receives"
+  PATIENT            ||--o{ PATIENT            : "family link"
+  PATIENT            ||--|| MEDICAL_RECORD     : "has one"
+
+  APPOINTMENT        ||--o{ PROCEDURE          : "includes"
+  APPOINTMENT        ||--o{ PATIENT_DOCUMENT   : "has"
+  APPOINTMENT        ||--|{ QUEUE              : "queued as"
+  APPOINTMENT        ||--o{ DIAGNOSIS          : "produces"
+  APPOINTMENT        ||--o{ PRESCRIPTION       : "produces"
+  APPOINTMENT        ||--o{ INVOICE            : "generates"
+
+  INVOICE            ||--o{ INVOICE_ITEM       : "contains"
+  INVOICE            ||--o{ PAYMENT            : "settled by"
+  INVOICE            ||--o{ DISCOUNT_APPROVAL  : "may have"
+
+  BILLING_CATALOG    ||--o{ INVOICE_ITEM       : "referenced in"
+
+  TREATMENT_PLAN     ||--o{ TREATMENT_SESSION  : "has"
+  TREATMENT_PLAN     ||--o{ PROCEDURE          : "generates"
