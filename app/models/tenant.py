@@ -94,4 +94,9 @@ class Tenant(Base):
     subscriptions: Mapped[list["Subscription"]] = relationship(
         "Subscription", back_populates="tenant"
     ) # plan
-    # users = relationship("Membership", back_populates="tenant")
+    
+    users = relationship(
+        "Membership",
+        back_populates="tenant",
+        cascade="all, delete-orphan",
+    )

@@ -2,7 +2,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -27,11 +27,24 @@ class Membership(Base, BaseMixin):
     
         
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    joined_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    joined_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
     user = relationship("User", back_populates="memberships")
     tenant = relationship("Tenant", back_populates="users")
-    role = relationship("Role")
+    role = relationship(
+        "Role",
+        back_populates="memberships"
+    )
+    user_preference = relationship(
+        "UserPreference",
+        back_populates="membership",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_memberships_user_id", "user_id"),
@@ -50,6 +63,7 @@ class Role(Base, BaseMixin):
     )
 
     permissions = relationship("RolePermission", back_populates="role")
+    memberships = relationship("Membership", back_populates="role")
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_role_name_per_tenant"),
@@ -62,12 +76,17 @@ class Role(Base, BaseMixin):
     )
 
 
-class RolePermission(Base):
+class RolePermission(Base, BaseMixin):
     __tablename__ = "role_permissions"
 
-    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id"), primary_key=True)
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("roles.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+
     permission_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("permissions.id"), primary_key=True
+        ForeignKey("permissions.id", ondelete="CASCADE"),
+        primary_key=True
     )
 
     role = relationship("Role", back_populates="permissions")
@@ -81,6 +100,8 @@ class Permission(Base, BaseMixin):
         String(100), unique=True
     )  # "create_user", "view_reports"
     description: Mapped[str] = mapped_column(String(255), nullable=True)
+    
+    roles = relationship("RolePermission", back_populates="permission")
 
 
 class User(Base, BaseMixin):
@@ -107,23 +128,25 @@ class User(Base, BaseMixin):
 class UserPreference(Base, BaseMixin):
     __tablename__ = "user_preferences"
 
-    membership_id = mapped_column(
+    membership_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("memberships.id"),
         unique=True
     )
 
-    notify_appointment = mapped_column(Boolean, default=False)
-    notify_waiting = mapped_column(Boolean, default=False)
-    notify_lab_results = mapped_column(Boolean, default=False)
-    notify_draft_reminder = mapped_column(Boolean, default=False)
-    notify_daily_summary = mapped_column(Boolean, default=False)
+    notify_appointment: Mapped[bool] = mapped_column(Boolean, default=False)
+    notify_waiting: Mapped[bool] = mapped_column(Boolean, default=False)
+    notify_lab_results: Mapped[bool] = mapped_column(Boolean, default=False)
+    notify_draft_reminder: Mapped[bool] = mapped_column(Boolean, default=False)
+    notify_daily_summary: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    require_otp = mapped_column(Boolean, default=False)
+    require_otp: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    membership = relationship("Membership", back_populates="user_preference")
+
 # class DoctorProfile(Base, BaseMixin):
 #     __tablename__ = "doctor_profiles"
 
-#     membership_id = mapped_column(
+#     membership_id: Mapped[uuid.UUID] = mapped_column(
 #         ForeignKey("memberships.id")
 #     )
 

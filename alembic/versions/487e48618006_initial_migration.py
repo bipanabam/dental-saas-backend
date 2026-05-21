@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: 96a22985b4d8
+Revision ID: 487e48618006
 Revises: 
-Create Date: 2026-05-21 18:07:46.475915
+Create Date: 2026-05-21 19:24:05.759983
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '96a22985b4d8'
+revision: str = '487e48618006'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -91,7 +91,7 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.UUID(), nullable=False),
     sa.Column('role_id', sa.UUID(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('joined_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('joined_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -108,18 +108,22 @@ def upgrade() -> None:
     op.create_table('role_permissions',
     sa.Column('role_id', sa.UUID(), nullable=False),
     sa.Column('permission_id', sa.UUID(), nullable=False),
-    sa.ForeignKeyConstraint(['permission_id'], ['permissions.id'], ),
-    sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ),
-    sa.PrimaryKeyConstraint('role_id', 'permission_id')
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['permission_id'], ['permissions.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('role_id', 'permission_id', 'id')
     )
     op.create_table('user_preferences',
-    sa.Column('membership_id', sa.UUID(), nullable=True),
-    sa.Column('notify_appointment', sa.Boolean(), nullable=True),
-    sa.Column('notify_waiting', sa.Boolean(), nullable=True),
-    sa.Column('notify_lab_results', sa.Boolean(), nullable=True),
-    sa.Column('notify_draft_reminder', sa.Boolean(), nullable=True),
-    sa.Column('notify_daily_summary', sa.Boolean(), nullable=True),
-    sa.Column('require_otp', sa.Boolean(), nullable=True),
+    sa.Column('membership_id', sa.UUID(), nullable=False),
+    sa.Column('notify_appointment', sa.Boolean(), nullable=False),
+    sa.Column('notify_waiting', sa.Boolean(), nullable=False),
+    sa.Column('notify_lab_results', sa.Boolean(), nullable=False),
+    sa.Column('notify_draft_reminder', sa.Boolean(), nullable=False),
+    sa.Column('notify_daily_summary', sa.Boolean(), nullable=False),
+    sa.Column('require_otp', sa.Boolean(), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

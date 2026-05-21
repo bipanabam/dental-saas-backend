@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.database import engine
 
+from app.api.v1.auth.router import router as auth_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -20,6 +21,8 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan
 )
+
+app.include_router(auth_router, prefix=settings.API_PREFIX)
 
 @app.get("/healthz")
 async def read_root() -> dict[str, str]:

@@ -11,3 +11,7 @@ wheels/
 
 .env.dev
 .env.compose
+
+# scripts
+app/scripts/seed_rbac.py
+app/scripts/run_seed.py
