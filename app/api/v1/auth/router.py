@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime, timedelta, timezone as UTC
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from sqlalchemy.orm import selectinload
@@ -19,14 +19,16 @@ from app.api.v1.auth.schemas import (
 from app.api.v1.auth.service import register_tenant_service
 
 from app.core.database import get_db
+from app.core.dependencies.session import CurrentSession
 from app.core.security import (
+    hash_token,
     verify_password,
     create_access_token,
     create_refresh_token,
     verify_token,
 )
-from app.core.dependencies.auth import CurrentUser
-from app.models.user import Membership, User
+from app.core.dependencies.auth import CurrentUser, get_current_user
+from app.models.user import Membership, User, UserSession
 from app.core.config import settings
 from app.models import User
 
@@ -139,8 +141,16 @@ async def login_for_access_token(
     )
     # Create refresh token
     refresh_token = create_refresh_token(
-        user_id=user.id,
+    user_id=user.id,
     )
+    # Store refresh token in DB
+    session = UserSession(
+        user_id=user.id,
+        refresh_token_hash=hash_token(refresh_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+    db.add(session)
+    await db.commit()
 
     return Token(
         access_token=access_token,
@@ -150,49 +160,27 @@ async def login_for_access_token(
     )
     
 # POST -> /auth/refresh
-@router.post(
-    "/refresh",
-    response_model=Token,
-)
+@router.post("/refresh", response_model=Token)
 async def refresh_access_token(
-    payload: RefreshIn,
+    current_session: CurrentSession,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Refresh access token using a valid refresh token.
+    Rotate refresh token and issue new access token.
     """
-
-    # Verify token
-    token_data = verify_token(payload.refresh_token)
-
-    if not token_data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Ensure refresh token type
-    if token_data.get("type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    user_id = token_data.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-        )
+    
+    user_id = current_session.payload["sub"]
+    session = current_session.session
 
     # Load user and memberships
     result = await db.execute(
         select(User)
         .options(
             selectinload(User.memberships)
-            .selectinload(Membership.role)
+            .selectinload(Membership.role),
+
+            selectinload(User.memberships)
+            .selectinload(Membership.tenant),
         )
         .where(User.id == user_id)
     )
@@ -217,6 +205,7 @@ async def refresh_access_token(
             membership
             for membership in user.memberships
             if membership.is_active
+            and membership.tenant.is_active
         ),
         None,
     )
@@ -226,19 +215,32 @@ async def refresh_access_token(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No active tenant membership found",
         )
+        
+    # revoke old session
+    session.is_revoked = True
+    session.revoked_at = datetime.now(timezone.utc)
 
-    # Create new access token
+    # new tokens
     access_token = create_access_token(
         user_id=user.id,
         tenant_id=membership.tenant_id,
         role=membership.role.name,
     )
-
-    # OPTIONAL:
-    # Rotate refresh token (recommended)
     refresh_token = create_refresh_token(
         user_id=user.id,
     )
+    
+    # Store new refresh token session
+    new_session = UserSession(
+        user_id=user.id,
+        refresh_token_hash=hash_token(refresh_token),
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+
+    db.add(new_session)
+    await db.commit()
+
 
     return Token(
         access_token=access_token,
@@ -246,7 +248,73 @@ async def refresh_access_token(
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+    
+    
+# POST -> /auth/logout
+@router.post("/logout")
+async def logout(
+    current_session: CurrentSession,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Logout current device/session.
+    """
 
+    if current_session.session.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden",
+        )
+
+    current_session.session.is_revoked = True
+    current_session.session.revoked_at = datetime.now(timezone.utc)
+
+    await db.commit()
+
+    return {
+        "message": "Logged out successfully",
+    }
+    
+    
+# POST -> /auth/logout-all
+@router.post("/logout-all")
+async def logout_all(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Logout from all devices.
+    """
+
+    result = await db.execute(
+        select(UserSession).where(
+            UserSession.user_id == current_user.id,
+            UserSession.is_revoked.is_(False),
+        )
+    )
+
+    sessions = result.scalars().all()
+    if not sessions:
+        raise HTTPException(
+            status_code=404,
+            detail="No active sessions found",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    for session in sessions:
+        session.is_revoked = True
+        session.revoked_at = now
+
+    await db.commit()
+
+    return {
+        "status_code": status.HTTP_200_OK,
+        "message": "Logged out from all devices",
+    }
+    
+    
 # GET -> /auth/me
 @router.get(
     "/me",

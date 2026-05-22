@@ -124,6 +124,33 @@ class User(Base, BaseMixin):
     phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
 
     memberships = relationship("Membership", back_populates="user")
+class UserSession(Base, BaseMixin):
+    __tablename__ = "user_sessions"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+
+    refresh_token_hash: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=False,
+    )
+
+    is_revoked: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+    )
+    revoked_at : Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    expires_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    user = relationship("User")
     
 class UserPreference(Base, BaseMixin):
     __tablename__ = "user_preferences"

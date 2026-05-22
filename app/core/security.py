@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 import uuid
+import hashlib
 
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordBearer
@@ -13,8 +14,14 @@ from app.core.config import settings
 
 password_hash = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/token")
 
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_PREFIX}/auth/token"
+)
+
+oauth2_refresh_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_PREFIX}/auth/refresh"
+)
 
 def hash_password(password: str) -> str:
     """Hash a plaintext password"""
@@ -25,6 +32,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plaintext password against a hashed password"""
     return bool(password_hash.verify(plain_password, hashed_password))
 
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 def create_access_token(
     *,
@@ -56,7 +65,9 @@ def create_refresh_token(
     *,
     user_id: uuid.UUID,
 ) -> str:
-    expire = datetime.now(UTC) + timedelta(days=30)
+    expire = datetime.now(UTC) + timedelta(
+        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )
 
     payload = {
         "sub": str(user_id),

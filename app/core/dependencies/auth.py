@@ -10,18 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.security import verify_access_token
-from app.core.config import settings
+from app.core.security import verify_access_token, oauth2_scheme
 
 from app.models.user import (
     Membership,
     Role,
     RolePermission,
     User,
-)
-
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_PREFIX}/auth/token"
 )
 
 
@@ -82,6 +77,22 @@ async def get_current_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+        
+    active_membership = next(
+        (
+            membership
+            for membership in user.memberships
+            if membership.is_active
+            and membership.tenant.is_active
+        ),
+        None,
+    )
+
+    if not active_membership:
+        raise HTTPException(
+            status_code=403,
+            detail="No active membership",
+    )
 
     return user
 
