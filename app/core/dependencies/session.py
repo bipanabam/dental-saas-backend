@@ -10,8 +10,7 @@ from app.api.v1.auth.schemas import RefreshIn
 from app.core.database import get_db
 from app.core.security import (
     hash_token,
-    verify_token,
-    oauth2_refresh_scheme
+    verify_token
 )
 from app.models.user import UserSession
 

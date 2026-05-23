@@ -13,19 +13,19 @@ from app.api.v1.auth.schemas import (
     Register,
     RegisterTenantResponse,
     Token,
-    RefreshIn,
     MeResponse,
+    ChangePasswordRequest
 )
 from app.api.v1.auth.service import register_tenant_service
 
 from app.core.database import get_db
 from app.core.dependencies.session import CurrentSession
 from app.core.security import (
+    hash_password,
     hash_token,
     verify_password,
     create_access_token,
     create_refresh_token,
-    verify_token,
 )
 from app.core.dependencies.auth import CurrentUser, get_current_user
 from app.models.user import Membership, User, UserSession
@@ -352,3 +352,22 @@ async def me(
         memberships=memberships,
         permissions=sorted(list(permissions)),
     )
+    
+# POST -> /auth/change-password
+@router.post("/password", status_code=status.HTTP_200_OK)
+async def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    if not verify_password(password_data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+        
+    current_user.hashed_password = hash_password(password_data.new_password)
+    await db.commit()
+    return {
+        "message": "Password Changed successfully"
+    }
