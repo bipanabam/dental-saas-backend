@@ -73,39 +73,6 @@ class Token(BaseModel):
 class RefreshIn(BaseModel):
     refresh_token: str
 
-# USER SCHEMAS
-class UserBase(BaseModel):
-    username: str
-    email: EmailStr
-    
-class UserMe(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-
-    email: EmailStr
-    username: str
-
-    phone_number: str | None = None
-
-    is_active: bool
-    is_verified: bool
-    
-class TenantSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    name: str
-    slug: str
-    
-class MembershipSummary(BaseModel):
-    tenant: TenantSummary
-    role: str
-    
-class MeResponse(UserMe):
-    memberships: list[MembershipSummary]
-    permissions: list[str]
-        
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8)

@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.auth.schemas import RefreshIn
+from app.schemas.tenant import RefreshIn
 from app.core.database import get_db
 from app.core.security import (
     hash_token,

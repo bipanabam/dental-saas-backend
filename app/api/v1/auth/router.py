@@ -1,22 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from sqlalchemy.orm import selectinload
 
-from app.api.v1.auth.schemas import (
-    MembershipSummary,
+from app.schemas.tenant import (
     Register,
     RegisterTenantResponse,
     Token,
-    MeResponse,
     ChangePasswordRequest
 )
-from app.api.v1.auth.service import register_tenant_service
+from app.schemas.users import (
+    CurrentUserResponse,
+    MembershipSummary,
+)
+
+from app.api.v1.auth.services import register_tenant_service
 
 from app.core.database import get_db
 from app.core.dependencies.session import CurrentSession
@@ -27,7 +30,7 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
 )
-from app.core.dependencies.auth import CurrentUser, get_current_user
+from app.core.dependencies.auth import CurrentAuth
 from app.models.user import Membership, User, UserSession
 from app.core.config import settings
 from app.models import User
@@ -254,14 +257,14 @@ async def refresh_access_token(
 @router.post("/logout")
 async def logout(
     current_session: CurrentSession,
-    current_user: CurrentUser,
+    auth: CurrentAuth,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Logout current device/session.
     """
 
-    if current_session.session.user_id != current_user.id:
+    if current_session.session.user_id != auth.user.id:
         raise HTTPException(
             status_code=403,
             detail="Forbidden",
@@ -280,7 +283,7 @@ async def logout(
 # POST -> /auth/logout-all
 @router.post("/logout-all")
 async def logout_all(
-    current_user: CurrentUser,
+    auth: CurrentAuth,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -289,7 +292,7 @@ async def logout_all(
 
     result = await db.execute(
         select(UserSession).where(
-            UserSession.user_id == current_user.id,
+            UserSession.user_id == auth.user.id,
             UserSession.is_revoked.is_(False),
         )
     )
@@ -318,38 +321,38 @@ async def logout_all(
 # GET -> /auth/me
 @router.get(
     "/me",
-    response_model=MeResponse,
+    response_model=CurrentUserResponse,
 )
 async def me(
-    current_user: CurrentUser,
+    auth: CurrentAuth,
 ):
     """Get current user info, including memberships and permissions"""
     memberships = []
     permissions = set()
 
-    for membership in current_user.memberships:
+    memberships.append(
+        MembershipSummary(
+            tenant=auth.membership.tenant,
+            role=auth.membership.role.name,
+            is_active=auth.membership.is_active,
+        )
+    )
 
-        memberships.append(
-            MembershipSummary(
-                tenant=membership.tenant,
-                role=membership.role.name,
-            )
+    for role_permission in auth.membership.role.permissions:
+        permissions.add(
+            role_permission.permission.name
         )
 
-        for role_permission in membership.role.permissions:
-            permissions.add(
-                role_permission.permission.name
-            )
+    return CurrentUserResponse(
+        id=auth.user.id,
+        email=auth.user.email,
+        username=auth.user.username,
+        phone_number=auth.user.phone_number,
+        is_active=auth.user.is_active,
+        is_verified=auth.user.is_verified,
 
-    return MeResponse(
-        id=current_user.id,
-        email=current_user.email,
-        username=current_user.username,
-        phone_number=current_user.phone_number,
-        is_active=current_user.is_active,
-        is_verified=current_user.is_verified,
-
-        memberships=memberships,
+        tenant=auth.membership.tenant,
+        role=auth.membership.role.name,
         permissions=sorted(list(permissions)),
     )
     
@@ -357,16 +360,16 @@ async def me(
 @router.post("/password", status_code=status.HTTP_200_OK)
 async def change_password(
     password_data: ChangePasswordRequest,
-    current_user: CurrentUser,
+    auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    if not verify_password(password_data.current_password, current_user.hashed_password):
+    if not verify_password(password_data.current_password, auth.user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
-        
-    current_user.hashed_password = hash_password(password_data.new_password)
+
+    auth.user.hashed_password = hash_password(password_data.new_password)
     await db.commit()
     return {
         "message": "Password Changed successfully"

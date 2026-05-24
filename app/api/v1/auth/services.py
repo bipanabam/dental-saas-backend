@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.auth.schemas import (
+from app.schemas.tenant import (
     Register,
     RegisterTenantResponse,
 )
@@ -71,7 +71,6 @@ async def register_tenant_service(
 
     # Create Subscription
     now = datetime.now(UTC)
-
     subscription = Subscription(
         tenant_id=tenant.id,
         plan=PlanEnum.BASIC,
@@ -105,7 +104,6 @@ async def register_tenant_service(
     )
 
     admin_role = role_result.scalar_one_or_none()
-
     if not admin_role:
         raise ValueError(
             "Admin role not seeded."
@@ -118,7 +116,6 @@ async def register_tenant_service(
         role_id=admin_role.id,
         is_active=True,
     )
-
     db.add(membership)
 
 

@@ -1,6 +1,7 @@
 import uuid
 
 from typing import Annotated
+from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -18,12 +19,18 @@ from app.models.user import (
     RolePermission,
     User,
 )
+from app.models.tenant import Tenant
 
 
+@dataclass
+class AuthContext:
+    user: User
+    membership: Membership
+    
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> User:
+) -> AuthContext:
 
     payload = verify_access_token(token)
 
@@ -94,10 +101,20 @@ async def get_current_user(
             detail="No active membership",
     )
 
-    return user
+    return AuthContext(user=user, membership=active_membership)
 
 
-CurrentUser = Annotated[
-    User,
+CurrentAuth = Annotated[
+    AuthContext,
     Depends(get_current_user),
+]
+
+async def get_current_tenant(
+    current_auth: CurrentAuth,
+):
+    return current_auth.membership.tenant
+
+CurrentTenant = Annotated[
+    Tenant,
+    Depends(get_current_tenant),
 ]
