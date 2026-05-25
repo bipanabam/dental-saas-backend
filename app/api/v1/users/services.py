@@ -36,16 +36,22 @@ def tenant_user_query(tenant_id: UUID):
 async def get_tenant_users(
     db: AsyncSession,
     tenant_id: UUID,
+    role: str | None = None,
 ) -> list[UserListItem]:
 
-    result = await db.execute(
-        tenant_user_query(tenant_id)
-    )
+    query = tenant_user_query(tenant_id)
 
+    # role filter
+    if role:
+        query = query.join(Role).where(
+            Role.name == role,
+            Role.tenant_id.is_(None),
+        )
+
+    result = await db.execute(query)
     users = result.scalars().unique().all()
 
     response: list[UserListItem] = []
-
     for user in users:
         membership = next(
             (
@@ -301,3 +307,69 @@ async def update_tenant_user(
         is_verified=user.is_verified,
         role=membership.role.name if membership else None,
     )
+    
+async def get_role_by_name(
+    db: AsyncSession,
+    role_name: str,
+) -> Role | None:
+    """Fetch a role by its name. Only global roles (tenant_id is None) are considered."""
+    result = await db.execute(
+        select(Role).where(
+            Role.name == role_name,
+            Role.tenant_id.is_(None),
+        )
+    )
+    return result.scalar_one_or_none()
+
+async def get_tenant_doctors(
+    db: AsyncSession,
+    tenant_id: UUID,
+) -> list[UserListItem]:
+
+    doctor_role_result = await db.execute(
+        select(Role).where(
+            Role.name == "doctor",
+            Role.tenant_id.is_(None),
+        )
+    )
+
+    doctor_role = doctor_role_result.scalar_one_or_none()
+
+    if not doctor_role:
+        return []
+
+    result = await db.execute(
+        tenant_user_query(tenant_id)
+        .where(Membership.role_id == doctor_role.id)
+    )
+
+    users = result.scalars().unique().all()
+
+    response: list[UserListItem] = []
+
+    for user in users:
+        membership = next(
+            (
+                membership
+                for membership in user.memberships
+                if membership.tenant_id == tenant_id
+            ),
+            None,
+        )
+
+        if not membership:
+            continue
+
+        response.append(
+            UserListItem(
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                phone_number=user.phone_number,
+                is_active=user.is_active,
+                is_verified=user.is_verified,
+                role=membership.role.name,
+            )
+        )
+
+    return response
