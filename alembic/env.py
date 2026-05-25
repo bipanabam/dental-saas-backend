@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from app.models import Tenant, Subscription, User, Role, Membership, RolePermission, UserPreference
+from app.models import *  # Import all models to ensure they are registered with SQLAlchemy's metadata
 from app.core.config import settings
 from app.core.database import Base
 
