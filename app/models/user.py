@@ -1,5 +1,4 @@
 # User, Role, Permission
-import enum
 import uuid
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
