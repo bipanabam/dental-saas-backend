@@ -7,13 +7,30 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.patient import Patient
+from app.models.patient import Patient, PatientFamilyLink
 from app.models.medical_record import MedicalRecord
 
-from app.schemas.patient import MedicalRecordSummary, PatientResponse, PatientListItem, PatientDetail
+from app.models.user import Membership, User, Role
+from app.schemas.patient import (
+    FamilyLinkCreate, 
+    FamilyListItem, 
+    PatientResponse, 
+    PatientListItem, 
+    PatientDetail, 
+    MedicalRecordSummary, 
+    MedicalRecordPayload
+)
 
 from app.utils.patient_code import generate_patient_code
-from app.utils.enums import PatientCategoryEnum, PatientStatusEnum, GenderEnum, BloodGroupEnum
+from app.utils.enums import (
+    RoleEnum,
+    FamilyRelationshipEnum, 
+    PatientCategoryEnum, 
+    PatientStatusEnum, 
+    GenderEnum, 
+    BloodGroupEnum
+)
+from app.utils.reverse_relationship import get_reverse_relationship
 
 
 class PatientService:
@@ -61,14 +78,14 @@ class PatientService:
             address=payload.address if payload.address else None,
             category=payload.category if payload.category else None,
             created_by_id=user_id,
-            updated_by_id=user_id,
         )
         db.add(new_patient)
         await db.flush()
         # create medical record automatically
         medical_record = MedicalRecord(
             patient_id=new_patient.id,
-            allergies=payload.allergies if payload.allergies else None
+            allergies=payload.allergies if payload.allergies else None,
+            created_by_id=user_id,
         )
         db.add(medical_record)
         
@@ -210,6 +227,7 @@ class PatientService:
             medical_record=MedicalRecordSummary(
                 id=patient.medical_record.id,
                 patient_id=patient.medical_record.patient_id,
+                primary_doctor_id=patient.medical_record.primary_doctor_id if patient.medical_record.primary_doctor_id else None,
                 systemic_conditions=patient.medical_record.systemic_conditions if patient.medical_record.systemic_conditions else None,
                 current_medications=patient.medical_record.current_medications if patient.medical_record.current_medications else None,
                 prior_surgeries=patient.medical_record.prior_surgeries if patient.medical_record.prior_surgeries else None,
@@ -262,6 +280,36 @@ class PatientService:
                 status=patient.status
             ) for patient in patients
         ]
+        
+    @staticmethod
+    async def check_duplicate_patient(
+        db: AsyncSession,
+        tenant_id: UUID,
+        phone: str | None = None,
+        email: str | None = None
+    ) -> bool:
+        """Check if a patient with the same phone or email already exists"""
+        if not phone and not email:
+            return False
+
+        query = select(Patient).where(Patient.tenant_id == tenant_id)
+        if phone and email:
+            query = query.where(
+                (Patient.phone == phone) | 
+                (Patient.email == email)
+            )
+        elif phone:
+            query = query.where(Patient.phone == phone)
+        elif email:
+            query = query.where(Patient.email == email)
+
+        result = await db.execute(query)
+        existing_patient = result.scalars().first()
+        
+        if existing_patient:
+            return True
+
+        return False
         
     @staticmethod
     async def update_patient(
@@ -367,3 +415,381 @@ class PatientService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to delete patient due to integrity error."
             )
+            
+    @staticmethod
+    async def get_medical_record_summary(
+        db: AsyncSession,
+        tenant_id: UUID,
+        patient_id: UUID
+    ) -> MedicalRecordSummary:
+        """Get medical record summary for a patient"""
+        query = (
+            select(MedicalRecord)
+            .join(Patient)
+            .where(
+                MedicalRecord.patient_id == patient_id,
+                Patient.tenant_id == tenant_id
+            )
+        )
+        result = await db.execute(query)
+        medical_record = result.scalars().first()
+        
+        if not medical_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Medical record not found for this patient"
+            )
+        
+        return MedicalRecordSummary(
+            id=medical_record.id,
+            patient_id=medical_record.patient_id,
+            primary_doctor_id=medical_record.primary_doctor_id if medical_record.primary_doctor_id else None,
+            allergies=medical_record.allergies if medical_record.allergies else None,
+            systemic_conditions=medical_record.systemic_conditions if medical_record.systemic_conditions else None,
+            current_medications=medical_record.current_medications if medical_record.current_medications else None,
+            prior_surgeries=medical_record.prior_surgeries if medical_record.prior_surgeries else None,
+            emergency_contact_name=medical_record.emergency_contact_name if medical_record.emergency_contact_name else None,
+            emergency_contact_phone=medical_record.emergency_contact_phone if medical_record.emergency_contact_phone else None, 
+        )
+        
+    @staticmethod
+    async def create_or_update_medical_record(
+        db: AsyncSession,
+        tenant_id: UUID,
+        user_id: UUID,
+        patient_id: UUID,
+        payload: MedicalRecordPayload
+    ) -> MedicalRecordSummary:
+        """Create or update medical record for a patient"""
+        query = (
+            select(MedicalRecord)
+            .join(Patient)
+            .where(
+                MedicalRecord.patient_id == patient_id,
+                Patient.tenant_id == tenant_id
+            )
+        )
+        result = await db.execute(query)
+        medical_record = result.scalars().first()
+        
+        if medical_record:
+            # Update existing medical record
+            for field in ['allergies', 'systemic_conditions', 'current_medications', 'prior_surgeries', 'emergency_contact_name', 'emergency_contact_phone']:
+                if hasattr(payload, field) and getattr(payload, field) is not None:
+                    setattr(medical_record, field, getattr(payload, field))
+            medical_record.updated_by_id = user_id
+        else:
+            # Create new medical record
+            medical_record = MedicalRecord(
+                patient_id=patient_id,
+                allergies=payload.allergies if payload.allergies else None,
+                systemic_conditions=payload.systemic_conditions if payload.systemic_conditions else None,
+                current_medications=payload.current_medications if payload.current_medications else None,
+                prior_surgeries=payload.prior_surgeries if payload.prior_surgeries else None,
+                emergency_contact_name=payload.emergency_contact_name if payload.emergency_contact_name else None,
+                emergency_contact_phone=payload.emergency_contact_phone if payload.emergency_contact_phone else None, 
+                created_by_id=user_id,
+            )
+            db.add(medical_record)
+        
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to create/update medical record due to integrity error."
+            )
+        
+        await db.refresh(medical_record)
+        
+        return MedicalRecordSummary(
+            id=medical_record.id,
+            patient_id=medical_record.patient_id,
+            primary_doctor_id=medical_record.primary_doctor_id if medical_record.primary_doctor_id else None,
+            allergies=medical_record.allergies if medical_record.allergies else None,
+            systemic_conditions=medical_record.systemic_conditions if medical_record.systemic_conditions else None,
+            current_medications=medical_record.current_medications if medical_record.current_medications else None,
+            prior_surgeries=medical_record.prior_surgeries if medical_record.prior_surgeries else None,
+            emergency_contact_name=medical_record.emergency_contact_name if medical_record.emergency_contact_name else None,
+            emergency_contact_phone=medical_record.emergency_contact_phone if medical_record.emergency_contact_phone else None, 
+        )
+    
+    @staticmethod
+    async def assign_primary_doctor(
+        db: AsyncSession,
+        tenant_id: UUID,
+        user_id: UUID,
+        patient_id: UUID,
+        doctor_id: UUID
+    ) -> MedicalRecordSummary:
+        """Assign or change primary doctor for a patient"""
+        query = (
+            select(MedicalRecord)
+            .join(Patient)
+            .where(
+                MedicalRecord.patient_id == patient_id,
+                Patient.tenant_id == tenant_id
+            )
+        )
+        result = await db.execute(query)
+        medical_record = result.scalars().first()
+        
+        if not medical_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Medical record not found for this patient"
+            )
+            
+        # verify doctor exists and is active
+        doctor_query = (
+            select(User)
+            .join(Membership, Membership.user_id == User.id)
+            .join(Role, Role.id == Membership.role_id)
+            .options(selectinload(User.memberships))
+            .where(
+                User.id == doctor_id,
+                User.is_active == True,
+
+                Membership.tenant_id == tenant_id,
+                Membership.is_active == True,
+
+                Role.name == RoleEnum.DOCTOR.value
+            )
+        )
+        doctor = await db.execute(doctor_query)
+        doctor = doctor.scalars().first()
+
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Doctor not found or not active"
+            )
+
+        medical_record.primary_doctor_id = doctor_id
+        medical_record.updated_by_id = user_id
+        
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to assign primary doctor due to integrity error."
+            )
+        
+        await db.refresh(medical_record)
+        
+        return MedicalRecordSummary(
+            id=medical_record.id,
+            patient_id=medical_record.patient_id,
+            primary_doctor_id=medical_record.primary_doctor_id,
+            allergies=medical_record.allergies if medical_record.allergies else None,
+            systemic_conditions=medical_record.systemic_conditions if medical_record.systemic_conditions else None,
+            current_medications=medical_record.current_medications if medical_record.current_medications else None,
+            prior_surgeries=medical_record.prior_surgeries if medical_record.prior_surgeries else None,
+            emergency_contact_name=medical_record.emergency_contact_name if medical_record.emergency_contact_name else None,
+            emergency_contact_phone=medical_record.emergency_contact_phone if medical_record.emergency_contact_phone else None, 
+        )  
+        
+    @staticmethod
+    async def list_family_members(
+        db: AsyncSession,
+        tenant_id: UUID,
+        primary_account_id: UUID
+    ) -> list[FamilyListItem]:
+        """List family members for a given patient"""
+
+        query = (
+            select(PatientFamilyLink)
+            .where(
+                PatientFamilyLink.tenant_id == tenant_id,
+                PatientFamilyLink.primary_patient_id == primary_account_id
+            )
+            .options(
+                selectinload(PatientFamilyLink.family_member)
+            )
+            .order_by(PatientFamilyLink.created_at.desc())
+        )
+
+        result = await db.execute(query)
+        family_links = result.scalars().all()
+
+        if not family_links:
+            return []
+
+        return [
+            FamilyListItem(
+                id=link.family_member.id,
+                first_name=link.family_member.first_name,
+                last_name=link.family_member.last_name,
+                relationship_type=(
+                    link.relationship_type.value
+                    if link.relationship_type
+                    else None
+                )
+            )
+            for link in family_links
+        ]
+        
+    @staticmethod
+    async def add_family_member(
+        db: AsyncSession,
+        tenant_id: UUID,
+        user_id: UUID,
+        primary_account_id: UUID,
+        payload: FamilyLinkCreate
+    ) -> FamilyListItem:
+        """Link an existing patient as family member"""
+
+        # prevent self-linking
+        if primary_account_id == payload.family_member_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Patient cannot be linked to themselves"
+            )
+
+        # verify primary patient exists
+        primary_patient_result = await db.execute(
+            select(Patient).where(
+                Patient.tenant_id == tenant_id,
+                Patient.id == primary_account_id
+            )
+        )
+
+        primary_patient = primary_patient_result.scalars().first()
+
+        if not primary_patient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Primary patient not found"
+            )
+
+        # verify family member exists
+        family_member_result = await db.execute(
+            select(Patient).where(
+                Patient.tenant_id == tenant_id,
+                Patient.id == payload.family_member_id
+            )
+        )
+
+        family_member = family_member_result.scalars().first()
+        if not family_member:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Family member not found"
+            )
+
+        # prevent duplicate link
+        existing_link_result = await db.execute(
+            select(PatientFamilyLink).where(
+                PatientFamilyLink.tenant_id == tenant_id,
+                PatientFamilyLink.primary_patient_id == primary_account_id,
+                PatientFamilyLink.family_member_id == payload.family_member_id
+            )
+        )
+
+        existing_link = existing_link_result.scalars().first()
+
+        if existing_link:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Family member already linked"
+            )
+
+        # create link
+        relationship_type  = payload.relationship_type if payload.relationship_type else FamilyRelationshipEnum.OTHER
+        reverse_relationship = get_reverse_relationship(
+            relationship=relationship_type,
+            patient_gender=primary_patient.gender
+        )
+        forward_link = PatientFamilyLink(
+            tenant_id=tenant_id,
+            primary_patient_id=primary_account_id,
+            family_member_id=payload.family_member_id,
+            relationship_type=relationship_type,
+            created_by_id=user_id,
+            updated_by_id=user_id,
+        )
+        reverse_link = PatientFamilyLink(
+            tenant_id=tenant_id,
+            primary_patient_id=payload.family_member_id,
+            family_member_id=primary_account_id,
+            relationship_type=reverse_relationship,
+            created_by_id=user_id,
+            updated_by_id=user_id,
+        )
+
+        db.add_all([
+            forward_link,
+            reverse_link
+        ])
+
+        try:
+            await db.commit()
+            await db.refresh(forward_link)
+        except Exception as e:
+            await db.rollback()
+            raise e
+
+        return FamilyListItem(
+            id=family_member.id,
+            first_name=family_member.first_name,
+            last_name=family_member.last_name,
+            relationship_type=(
+                forward_link.relationship_type
+                if forward_link.relationship_type
+                else None
+            )
+        )
+        
+    @staticmethod
+    async def remove_family_member(
+        db: AsyncSession,
+        tenant_id: UUID,
+        primary_account_id: UUID,
+        family_member_id: UUID
+    ):
+        """Unlink a family member from the patient"""
+
+        # verify link exists
+        link_result = await db.execute(
+            select(PatientFamilyLink).where(
+                PatientFamilyLink.tenant_id == tenant_id,
+                PatientFamilyLink.primary_patient_id == primary_account_id,
+                PatientFamilyLink.family_member_id == family_member_id
+            )
+        )
+
+        link = link_result.scalars().first()
+
+        if not link:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Family link not found"
+            )
+
+        # delete both forward and reverse links
+        reverse_link_result = await db.execute(
+            select(PatientFamilyLink).where(
+                PatientFamilyLink.tenant_id == tenant_id,
+                PatientFamilyLink.primary_patient_id == family_member_id,
+                PatientFamilyLink.family_member_id == primary_account_id
+            )
+        )
+
+        reverse_link = reverse_link_result.scalars().first()
+        if not reverse_link:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Reverse family link not found"
+            )
+
+        await db.delete(link)
+        await db.delete(reverse_link)
+
+        try:
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            raise e

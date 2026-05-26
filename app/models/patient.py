@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.models.base import BaseMixin
-from app.utils.enums import GenderEnum, BloodGroupEnum, PatientCategoryEnum, PatientStatusEnum, FamilyRelationEnum
+from app.utils.enums import GenderEnum, BloodGroupEnum, PatientCategoryEnum, PatientStatusEnum, FamilyRelationshipEnum
 
 class Patient(Base, BaseMixin):
     __tablename__ = "patients"
@@ -51,13 +51,6 @@ class Patient(Base, BaseMixin):
     visit_count: Mapped[int] = mapped_column(Integer, default=0)
     last_visit_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     
-    primary_account_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("patients.id", ondelete="SET NULL"),
-    )
-    family_relation: Mapped[FamilyRelationEnum | None] = mapped_column(
-        Enum(FamilyRelationEnum, name="family_relation_enum")
-    )
-    
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -74,12 +67,19 @@ class Patient(Base, BaseMixin):
         uselist=False,
         cascade="all, delete-orphan",
     )
-
-    primary_account = relationship(
-        "Patient",
-        remote_side="Patient.id",
-        backref="family_members",
+    family_links = relationship(
+        "PatientFamilyLink",
+        foreign_keys="PatientFamilyLink.primary_patient_id",
+        back_populates="primary_patient",
+        cascade="all, delete-orphan",
     )
+
+    linked_to = relationship(
+        "PatientFamilyLink",
+        foreign_keys="PatientFamilyLink.family_member_id",
+        back_populates="family_member",
+    )
+        
     __table_args__ = (
         UniqueConstraint(
             "tenant_id",
@@ -97,6 +97,59 @@ class Patient(Base, BaseMixin):
             "last_name",
             "phone",
             "email",
-            unique=True,
         ),
     )
+    
+class PatientFamilyLink(Base, BaseMixin):
+    __tablename__ = "patient_family_links"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    primary_patient_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    family_member_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    relationship_type: Mapped[FamilyRelationshipEnum] = mapped_column(
+        Enum(FamilyRelationshipEnum, name="family_relationship_enum"),
+        nullable=False,
+    )
+    
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_by_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,  
+    )
+    
+    # relationships
+    primary_patient = relationship(
+        "Patient",
+        foreign_keys=[primary_patient_id],
+        back_populates="family_links",
+    )
+
+    family_member = relationship(
+        "Patient",
+        foreign_keys=[family_member_id],
+        back_populates="linked_to",
+    )
+    
+    __table_args__ = (
+    UniqueConstraint(
+        "primary_patient_id",
+        "family_member_id",
+        name="uq_patient_family_link"
+    ),
+)

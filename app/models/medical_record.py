@@ -36,6 +36,15 @@ class MedicalRecord(Base, BaseMixin):
 
     title: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str | None] = mapped_column(String(50))
+    
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_by_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,  
+    )
 
     patient = relationship(
         "Patient",

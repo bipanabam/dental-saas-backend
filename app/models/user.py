@@ -8,14 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.models.base import BaseMixin
 
-
-class RoleEnum(str, enum.Enum):
-    SUPERADMIN = "superadmin"
-    ADMIN = "admin"
-    DOCTOR = "doctor"
-    RECEPTIONIST = "receptionist"
-
-
 class Membership(Base, BaseMixin):
     __tablename__ = "memberships"
 

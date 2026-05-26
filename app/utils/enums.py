@@ -1,5 +1,10 @@
 from enum import Enum
 
+class RoleEnum(str, Enum):
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    DOCTOR = "doctor"
+    RECEPTIONIST = "receptionist"
 
 class GenderEnum(str, Enum):
     MALE = "MALE"
@@ -31,9 +36,21 @@ class PatientCategoryEnum(str, Enum):
     SENIOR = "SENIOR"
 
 
-class FamilyRelationEnum(str, Enum):
-    SELF = "SELF"
+class FamilyRelationshipEnum(str, Enum):
     SPOUSE = "SPOUSE"
-    CHILD = "CHILD"
-    PARENT = "PARENT"
+    HUSBAND = "HUSBAND"
+    WIFE = "WIFE"
+
+    FATHER = "FATHER"
+    MOTHER = "MOTHER"
+
+    SON = "SON"
+    DAUGHTER = "DAUGHTER"
+
+    BROTHER = "BROTHER"
+    SISTER = "SISTER"
+
+    GRANDPARENT = "GRANDPARENT"
+    GRANDCHILD = "GRANDCHILD"
+
     OTHER = "OTHER"
