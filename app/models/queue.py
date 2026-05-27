@@ -3,7 +3,8 @@ import uuid
 
 from sqlalchemy import (
     Enum,
-    ForeignKey
+    ForeignKey,
+    UniqueConstraint
 )
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -50,4 +51,10 @@ class Queue(Base, BaseMixin):
     appointment = relationship(
         "Appointment",
         back_populates="queue_entry",
+    )
+    
+    UniqueConstraint(
+        "tenant_id",
+        "queue_date",
+        "token_number",
     )

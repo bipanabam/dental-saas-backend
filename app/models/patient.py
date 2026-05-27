@@ -79,6 +79,10 @@ class Patient(Base, BaseMixin):
         foreign_keys="PatientFamilyLink.family_member_id",
         back_populates="family_member",
     )
+    appointments = relationship(
+        "Appointment",
+        back_populates="patient",
+    )
         
     __table_args__ = (
         UniqueConstraint(

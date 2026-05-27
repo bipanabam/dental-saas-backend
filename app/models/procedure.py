@@ -77,6 +77,10 @@ class ProcedureCatalog(Base, BaseMixin):
         "Procedure",
         back_populates="procedure_catalog",
     )
+    appointment_procedures = relationship(
+        "AppointmentProcedure",
+        back_populates="procedure_catalog",
+    )
 
     __table_args__ = (
         UniqueConstraint(

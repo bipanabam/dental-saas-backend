@@ -29,24 +29,6 @@ router = APIRouter(
     tags=["patients"],
 )
 
-# POST -> /patients
-@router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
-async def create_patient(
-    payload: PatientCreate,
-    auth: CurrentAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: None = CanCreatePatients,
-) -> PatientResponse:
-    """Create a new patient for the tenant"""
-
-    return await PatientService.create_patient(
-        db=db,
-        tenant_id=auth.membership.tenant_id,
-        tenant_name=auth.membership.tenant.name,
-        user_id=auth.user.id,
-        payload=payload
-    )
-    
 # GET -> /patients
 @router.get("/", response_model=list[PatientListItem])
 async def list_patients(
@@ -121,6 +103,24 @@ async def check_duplicate_patient(
         email=email,
         phone=phone
     )   
+    
+# POST -> /patients
+@router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
+async def create_patient(
+    payload: PatientCreate,
+    auth: CurrentAuth,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: None = CanCreatePatients,
+) -> PatientResponse:
+    """Create a new patient for the tenant"""
+
+    return await PatientService.create_patient(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        tenant_name=auth.membership.tenant.name,
+        user_id=auth.user.id,
+        payload=payload
+    )
 
 # GET -> /patients/{patient_id}
 @router.get("/{patient_id}", response_model=PatientDetail)

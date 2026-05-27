@@ -38,7 +38,7 @@ class Appointment(Base, BaseMixin):
         nullable=False,
         index=True,
     )
-    doctor_id: Mapped[uuid.UUID | None] = mapped_column(
+    assigned_doctor_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -107,12 +107,20 @@ class Appointment(Base, BaseMixin):
         back_populates="appointment",
         cascade="all, delete-orphan",
     )
-
     queue_entry = relationship(
         "Queue",
         back_populates="appointment",
         uselist=False,
         cascade="all, delete-orphan",
+    )
+    patient = relationship(
+        "Patient",
+        back_populates="appointments",
+    )
+
+    doctor = relationship(
+        "User",
+        foreign_keys=[assigned_doctor_id],
     )
 
 
@@ -185,13 +193,13 @@ class AppointmentProcedure(Base, BaseMixin):
     )
     procedure_catalog = relationship(
         "ProcedureCatalog",
+        back_populates="appointment_procedures",
     )
-
+    
     __table_args__ = (
         UniqueConstraint(
             "appointment_id",
             "procedure_catalog_id",
-            "tooth_numbers",
             name="uq_appointment_planned_procedure",
         ),
     )

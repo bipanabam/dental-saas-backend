@@ -37,3 +37,10 @@ CanReadPatients = require_permissions("patients.read")
 CanCreatePatients = require_permissions("patients.create")
 CanUpdatePatients = require_permissions("patients.update") 
 CanDeletePatients = require_permissions("patients.delete")
+
+# Appointments
+CanCreateAppointments = require_permissions("appointments.create")
+CanReadAppointments = require_permissions("appointments.read")
+CanUpdateAppointments = require_permissions("appointments.update")
+CanDeleteAppointments = require_permissions("appointments.delete")
+CanCheckInAppointments = require_permissions("appointments.checkin")
