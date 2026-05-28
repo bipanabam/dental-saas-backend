@@ -7,8 +7,10 @@ from app.utils.enums import (
     BloodGroupEnum, 
     PatientCategoryEnum, 
     PatientStatusEnum,
-    FamilyRelationshipEnum
+    FamilyRelationshipEnum,
+    AppointmentStatusEnum
 )
+
 
 class PatientCreate(BaseModel):
     first_name: str
@@ -162,3 +164,47 @@ class FamilyLinkCreate(BaseModel):
     # primary_account_id: UUID
     family_member_id: UUID
     relationship_type: FamilyRelationshipEnum | None
+    
+class PatientAppointmentMini(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    appointment_date: datetime
+    status: AppointmentStatusEnum
+    chief_complaint: str | None = None
+
+
+class PatientSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    patient_code: str
+
+    first_name: str
+    last_name: str
+
+    phone: str
+    email: str | None = None
+
+    gender: GenderEnum
+    blood_group: BloodGroupEnum | None = None
+    date_of_birth: date
+
+    status: PatientStatusEnum
+
+    visit_count: int
+    last_visit_at: datetime | None = None
+
+    allergies: str | None = None
+    systemic_conditions: str | None = None
+    current_medications: str | None = None
+
+    primary_doctor_name: str | None = None
+
+    latest_appointment: (
+        PatientAppointmentMini | None
+    )
+
+    upcoming_appointment: (
+        PatientAppointmentMini | None
+    )

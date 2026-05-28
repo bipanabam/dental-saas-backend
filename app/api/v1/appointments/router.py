@@ -16,7 +16,6 @@ from app.core.dependencies.permissions import (
 )
 
 from app.api.v1.appointments.services import AppointmentService, AppointmentWorkflowService
-from app.utils.enums import AppointmentStatusEnum
 
 from app.schemas.appointment import (
     AppointmentListResponse,
@@ -29,7 +28,8 @@ from app.schemas.appointment import (
     AppointmentCancel,
     AppointmentReschedule,
     AppointmentFollowUpCreate,
-    AppointmentCheckInResponse
+    AppointmentCheckInResponse,
+    TodaysAppointmentListResponse
 )
 
 router = APIRouter(
@@ -60,7 +60,31 @@ async def list_appointments(
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No patients found for this tenant"
+            detail="No appointments found"
+        )
+        
+    return result
+
+# GET -> /appointments/today
+@router.get("/today", response_model=TodaysAppointmentListResponse)
+async def list_todays_appointments(
+    auth: CurrentAuth,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    _: None = CanReadAppointments,
+):
+    """Today's appointments with queue status"""
+    result =  await AppointmentService.list_todays_appointments(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        skip=skip,
+        limit=limit
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No appointments found for today"
         )
         
     return result

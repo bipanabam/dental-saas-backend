@@ -26,7 +26,10 @@ from app.schemas.appointment import (
     AppointmentCancel,
     AppointmentReschedule,
     AppointmentFollowUpCreate,
-    AppointmentCheckInResponse
+    AppointmentCheckInResponse,
+    TodaysAppointmentListResponse,
+    TodaysAppointmentListItem,
+    QueueMini
 )
 
 from app.utils.enums import (
@@ -232,21 +235,17 @@ class AppointmentService:
             )
 
         return planned_procedures
-    
+        
     @staticmethod
     async def _create_queue_entry(
         db: AsyncSession,
         tenant_id: UUID,
         appointment: Appointment,
     ) -> Queue:
-        """
-        Create queue entry safely.
-        """
 
         today = datetime.now(UTC).date()
-        MAX_RETRIES = 3
 
-        for _ in range(MAX_RETRIES):
+        for _ in range(3):
 
             token_result = await db.execute(
                 select(func.max(Queue.token_number))
@@ -257,6 +256,7 @@ class AppointmentService:
             )
 
             next_token = (token_result.scalar() or 0) + 1
+
             queue_entry = Queue(
                 tenant_id=tenant_id,
                 appointment_id=appointment.id,
@@ -863,9 +863,105 @@ class AppointmentService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to cancel appointment",
             )
-     
-     
+            
+    @staticmethod
+    async def list_todays_appointments(
+    db: AsyncSession,
+    tenant_id: UUID,
+    skip: int = 0,
+    limit: int = 20,
+    ) -> TodaysAppointmentListResponse:
+        """
+        List today's appointments with queue status.
+        """
 
+        today = datetime.now(UTC).date()
+
+        filters = [
+            Appointment.tenant_id == tenant_id,
+            func.date(Appointment.appointment_date)
+            == today,
+
+            Appointment.status.notin_([
+                AppointmentStatusEnum.CANCELLED,
+                AppointmentStatusEnum.NO_SHOW,
+            ])
+        ]
+
+        total_query = (
+            select(func.count(Appointment.id))
+            .where(*filters)
+        )
+
+        total_result = await db.execute(
+            total_query
+        )
+
+        total = total_result.scalar() or 0
+
+        query = (
+            select(Appointment)
+            .where(*filters)
+            .options(
+                selectinload(
+                    Appointment.patient
+                ),
+
+                selectinload(
+                    Appointment.queue_entry
+                ),
+
+                selectinload(
+                    Appointment.planned_procedures
+                ),
+            )
+            .outerjoin(
+                Queue,
+                Queue.appointment_id
+                == Appointment.id
+            )
+            .order_by(
+                Queue.token_number.asc()
+                .nullslast(),
+
+                Appointment.appointment_date.asc(),
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+        result = await db.execute(query)
+        appointments = (
+            result.scalars()
+            .unique()
+            .all()
+        )
+
+        return TodaysAppointmentListResponse(
+            items=[
+                TodaysAppointmentListItem(
+                    appointment=(
+                        AppointmentListItem.model_validate(
+                            appointment
+                        )
+                    ),
+
+                    queue=(
+                        QueueMini.model_validate(
+                            appointment.queue_entry
+                        )
+                        if appointment.queue_entry
+                        else None
+                    ),
+                )
+                for appointment in appointments
+            ],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+
+     
 # AppointmentWorkflowService 
 class AppointmentWorkflowService:
     @staticmethod
@@ -932,17 +1028,10 @@ class AppointmentWorkflowService:
         tenant_id: UUID,
         appointment: Appointment,
     ) -> Queue:
-        """
-        Create queue entry safely.
-        """
-
-        if appointment.queue_entry:
-            return appointment.queue_entry
 
         today = datetime.now(UTC).date()
-        MAX_RETRIES = 3
 
-        for _ in range(MAX_RETRIES):
+        for _ in range(3):
 
             token_result = await db.execute(
                 select(func.max(Queue.token_number))
@@ -953,6 +1042,7 @@ class AppointmentWorkflowService:
             )
 
             next_token = (token_result.scalar() or 0) + 1
+
             queue_entry = Queue(
                 tenant_id=tenant_id,
                 appointment_id=appointment.id,
@@ -975,7 +1065,6 @@ class AppointmentWorkflowService:
             status_code=409,
             detail="Failed generating queue token",
         )
-
     
     @staticmethod
     async def _cancel_queue_entry():

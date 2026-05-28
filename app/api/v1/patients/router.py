@@ -24,7 +24,8 @@ from app.schemas.patient import (
     PatientResponse, 
     PatientDetail, 
     PatientUpdate,
-    MedicalRecordSummary
+    MedicalRecordSummary,
+    PatientSummaryResponse
 )
 from app.schemas.appointment import AppointmentListResponse, AppointmentFilter
 from app.core.database import AsyncSession, get_db  
@@ -359,4 +360,26 @@ async def list_patient_appointments(
         filter=filter,
         skip=skip,
         limit=limit,
+    )
+    
+# GET -> /patients/{patient_id}/summary
+@router.get(
+    "/{patient_id}/summary",
+    response_model=PatientSummaryResponse,
+)
+async def get_patient_summary(
+    patient_id: UUID,
+    auth: CurrentAuth,
+    db: Annotated[
+        AsyncSession,
+        Depends(get_db)
+    ],
+    _: None = CanReadPatients,
+):
+    """Printable one-page patient summary"""
+
+    return await PatientService.get_patient_summary(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        patient_id=patient_id,
     )

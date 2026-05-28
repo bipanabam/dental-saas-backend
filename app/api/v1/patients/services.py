@@ -1,15 +1,18 @@
 from uuid import UUID
+from datetime import datetime, UTC
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.models.patient import Patient, PatientFamilyLink
 from app.models.medical_record import MedicalRecord
 
 from app.models.user import Membership, User, Role
+from app.models.appointment import Appointment
+
 from app.schemas.patient import (
     PatientListItem, 
     PatientListResponse,
@@ -19,7 +22,9 @@ from app.schemas.patient import (
     FamilyLinkCreate, 
     FamilyListItem, 
     MedicalRecordSummary, 
-    MedicalRecordPayload
+    MedicalRecordPayload,
+    PatientAppointmentMini,
+    PatientSummaryResponse
 )
 from app.schemas.appointment import AppointmentListResponse, AppointmentFilter
 
@@ -789,4 +794,136 @@ class PatientService:
             filter=filter,
             skip=skip,
             limit=limit
+        )
+        
+    @staticmethod
+    async def get_patient_summary(
+        db: AsyncSession,
+        tenant_id: UUID,
+        patient_id: UUID,
+    ) -> PatientSummaryResponse:
+        """Get printable patient summary"""
+
+        query = (
+            select(Patient)
+            .where(
+                Patient.id == patient_id,
+                Patient.tenant_id == tenant_id,
+            )
+            .options(
+                joinedload(Patient.medical_record)
+                .joinedload(MedicalRecord.primary_doctor),
+
+                selectinload(Patient.appointments),
+            )
+        )
+
+        result = await db.execute(query)
+        patient = result.scalar_one_or_none()
+
+        if not patient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Patient not found",
+            )
+
+        now = datetime.now(UTC)
+
+        latest_appointment = None
+        upcoming_appointment = None
+
+        appointments = sorted(
+            patient.appointments,
+            key=lambda a: a.appointment_date,
+            reverse=True,
+        )
+
+        # latest completed/in-progress/checkedin
+        for appointment in appointments:
+            if appointment.appointment_date <= now:
+                latest_appointment = appointment
+                break
+
+        # next upcoming
+        future_appointments = sorted(
+            [
+                a for a in patient.appointments
+                if a.appointment_date > now
+            ],
+            key=lambda a: a.appointment_date,
+        )
+
+        if future_appointments:
+            upcoming_appointment = (
+                future_appointments[0]
+            )
+
+        medical_record = patient.medical_record
+
+        primary_doctor_name = None
+
+        if (
+            medical_record
+            and medical_record.primary_doctor
+        ):
+            primary_doctor_name = (
+                f"{medical_record.primary_doctor.username} "
+            )
+
+        return PatientSummaryResponse(
+            id=patient.id,
+            patient_code=patient.patient_code,
+
+            first_name=patient.first_name,
+            last_name=patient.last_name,
+
+            phone=patient.phone,
+            email=patient.email,
+
+            gender=patient.gender,
+            blood_group=patient.blood_group,
+            date_of_birth=patient.date_of_birth,
+
+            status=patient.status,
+
+            visit_count=patient.visit_count,
+            last_visit_at=patient.last_visit_at,
+
+            allergies=(
+                medical_record.allergies
+                if medical_record
+                else None
+            ),
+
+            systemic_conditions=(
+                medical_record.systemic_conditions
+                if medical_record
+                else None
+            ),
+
+            current_medications=(
+                medical_record.current_medications
+                if medical_record
+                else None
+            ),
+
+            primary_doctor_name=(
+                primary_doctor_name
+            ),
+
+            latest_appointment=(
+                PatientAppointmentMini.model_validate(
+                    latest_appointment
+                )
+                if latest_appointment
+                else None
+            ),
+
+            upcoming_appointment=(
+                PatientAppointmentMini.model_validate(
+                    upcoming_appointment
+                )
+                if upcoming_appointment
+                else None
+            ),
         )

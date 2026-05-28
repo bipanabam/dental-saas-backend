@@ -195,3 +195,27 @@ class AppointmentFollowUpCreate(BaseModel):
 
     chief_complaint: str | None = None
     notes: str | None = None
+    
+class QueueMini(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+    id: UUID
+    token_number: int
+    status: QueueStatusEnum
+
+class TodaysAppointmentListItem(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+    appointment: AppointmentListItem
+    queue: QueueMini | None = None
+
+
+class TodaysAppointmentListResponse(BaseModel):
+    items: list[TodaysAppointmentListItem]
+    total: int
+    skip: int
+    limit: int

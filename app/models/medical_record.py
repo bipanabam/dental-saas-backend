@@ -50,3 +50,7 @@ class MedicalRecord(Base, BaseMixin):
         "Patient",
         back_populates="medical_record",
     )
+    primary_doctor = relationship(
+        "User",
+        foreign_keys=[primary_doctor_id],
+    )
