@@ -106,7 +106,7 @@ async def walk_in_appointment(
     
 
 # GET -> /appointments/{appointment_id}
-@router.get("/appointments/{appointment_id}", response_model=AppointmentDetail)
+@router.get("/{appointment_id}", response_model=AppointmentDetail)
 async def get_appointment_detail(
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -120,7 +120,7 @@ async def get_appointment_detail(
         appointment_id=appointment_id
     )
 
-@router.put("/appointments/{appointment_id}", response_model=AppointmentListItem, status_code=status.HTTP_201_CREATED)
+@router.put("/{appointment_id}", response_model=AppointmentListItem, status_code=status.HTTP_201_CREATED)
 async def update_appointment(
     payload: AppointmentUpdate,
     auth: CurrentAuth,
@@ -138,7 +138,7 @@ async def update_appointment(
         payload=payload
     )
     
-@router.delete("/appointments/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def cancel_appointment(
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],

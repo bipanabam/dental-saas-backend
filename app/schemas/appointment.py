@@ -115,6 +115,8 @@ class AppointmentListItem(BaseModel):
     payment_status: PaymentStatusEnum
 
     chief_complaint: str | None
+    
+    source: AppointmentSourceEnum
 
     created_at: datetime
 

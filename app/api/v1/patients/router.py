@@ -1,27 +1,35 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies.auth import CurrentAuth
-from app.core.dependencies.permissions import CanCreatePatients, CanReadPatients
+from app.core.dependencies.permissions import (
+    CanCreatePatients, 
+    CanReadPatients,
+    CanUpdatePatients,
+    CanDeletePatients,
+    CanReadAppointments
+)
 from app.schemas.patient import (
+    PatientListItem, 
+    PatientFilter,
+    PatientListResponse,
     FamilyLinkCreate, 
     FamilyListItem,
     MedicalRecordPayload, 
     PatientCreate, 
     PatientResponse, 
-    PatientListItem, 
     PatientDetail, 
     PatientUpdate,
     MedicalRecordSummary
 )
+from app.schemas.appointment import AppointmentListResponse, AppointmentFilter
 from app.core.database import AsyncSession, get_db  
 
 from app.api.v1.patients.services import PatientService
-from app.utils.enums import PatientCategoryEnum, PatientStatusEnum, GenderEnum, BloodGroupEnum
 
 
 router = APIRouter(
@@ -30,25 +38,26 @@ router = APIRouter(
 )
 
 # GET -> /patients
-@router.get("/", response_model=list[PatientListItem])
+@router.get("/", response_model=PatientListResponse)
 async def list_patients(
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
-    category: PatientCategoryEnum | None = None,
-    status: PatientStatusEnum | None = None,
-    gender: GenderEnum | None = None,
-    blood_group: BloodGroupEnum | None = None,
+    filter: Annotated[
+        PatientFilter,
+        Depends()
+    ],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=50),
     _: None = CanReadPatients,
-) -> list[PatientListItem]:
+):
     """List all patients for the tenant"""
 
     result =  await PatientService.list_patients(
         db=db,
         tenant_id=auth.membership.tenant_id,
-        category=category,
-        status=status,
-        gender=gender,
-        blood_group=blood_group
+        filter=filter,
+        skip=skip,
+        limit=limit
     )
     if result is None:
         raise HTTPException(
@@ -145,7 +154,7 @@ async def update_patient(
     payload: PatientUpdate,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: None = CanCreatePatients,
+    _: None = CanUpdatePatients,
 ):
     """Update a specific patient by ID"""
 
@@ -163,7 +172,7 @@ async def delete_patient(
     patient_id: UUID,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: None = CanCreatePatients,
+    _: None = CanDeletePatients,
 ):
     """Delete a specific patient by ID"""
 
@@ -174,6 +183,27 @@ async def delete_patient(
         patient_id=patient_id
     )
     
+# DELETE -> /patients/{patient_id}
+@router.put("/{patient_id}/restore")
+async def restore_patient(
+    patient_id: UUID,
+    auth: CurrentAuth,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: None = CanUpdatePatients,
+):
+    """
+    Restore a soft-deleted patient in the tenant.
+    """
+
+    await PatientService.restore_patient(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        user_id=auth.user.id,
+        patient_id=patient_id
+    )
+    return {"detail": "Patient restored successfully"}
+    
+
 # GET -> /{patient_id}/medical-record
 @router.get("/{patient_id}/medical-record", response_model=MedicalRecordSummary)
 async def get_medical_record(
@@ -270,9 +300,9 @@ async def add_family_member(
     payload: FamilyLinkCreate,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: None = CanCreatePatients,
+    _: None = CanUpdatePatients,
 ) -> FamilyListItem:
-    """Link a family member to a specific patient"""
+    """Link an existing patient as family member"""
 
     return await PatientService.add_family_member(
         db=db,
@@ -289,7 +319,7 @@ async def remove_family_member(
     family_member_id: UUID,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: None = CanCreatePatients,
+    _: None = CanUpdatePatients,
 ):
     """Unlink a family member from a specific patient"""
 
@@ -299,3 +329,34 @@ async def remove_family_member(
         primary_account_id=patient_id,
         family_member_id=family_member_id   
         )
+    
+# GET -> /{patient_id}/appointments
+@router.get(
+    "/{patient_id}/appointments",
+    response_model=AppointmentListResponse,
+)
+async def list_patient_appointments(
+    patient_id: UUID,
+    auth: CurrentAuth,
+    db: Annotated[
+        AsyncSession,
+        Depends(get_db)
+    ],
+    filter: Annotated[
+        AppointmentFilter,
+        Depends()
+    ],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=50),
+    _: None = CanReadAppointments,
+) -> AppointmentListResponse:
+    """List appointments for patient"""
+
+    return await PatientService.get_appointments(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        patient_id=patient_id,
+        filter=filter,
+        skip=skip,
+        limit=limit,
+    )

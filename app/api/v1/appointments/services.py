@@ -354,6 +354,95 @@ class AppointmentService:
         )
         
     @staticmethod
+    async def list_patient_appointments(
+        db: AsyncSession,
+        tenant_id: UUID,
+        patient_id: UUID,
+        filter: AppointmentFilter,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> AppointmentListResponse:
+        """
+        List all appointments for a patient.
+        """
+        filters = [
+            Appointment.tenant_id == tenant_id,
+            Appointment.patient_id == patient_id,
+        ]
+        
+        # filter
+        if filter.date_range:
+            filters.append(
+                func.date(Appointment.appointment_date) == filter.date_range
+            )
+        if filter.status:
+            filters.append(
+                Appointment.status == filter.status
+            )
+        if filter.doctor_id:
+            filters.append(
+                Appointment.assigned_doctor_id
+                == filter.doctor_id
+            )
+        if filter.appointment_type:
+            filters.append(
+                Appointment.appointment_type
+                == filter.appointment_type
+            )
+        if filter.source:
+            filters.append(
+                Appointment.source
+                == filter.source
+            )
+
+        total_query = (
+            select(func.count(Appointment.id))
+            .where(*filters)
+        )
+
+        total_result = await db.execute(
+            total_query
+        )
+        total = total_result.scalar() or 0
+
+        query = (
+            select(Appointment)
+            .where(*filters)
+            .options(
+                selectinload(
+                    Appointment.planned_procedures
+                ),
+                selectinload(
+                    Appointment.queue_entry
+                ),
+            )
+            .order_by(
+                Appointment.appointment_date.desc()
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+        result = await db.execute(query)
+        appointments = (
+            result.scalars()
+            .unique()
+            .all()
+        )
+
+        return AppointmentListResponse(
+            items=[
+                AppointmentListItem.model_validate(
+                    appointment
+                )
+                for appointment in appointments
+            ],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+        
+    @staticmethod
     async def create_appointment(
         db: AsyncSession,
         tenant_id: UUID,

@@ -1,8 +1,7 @@
 from uuid import UUID
-from datetime import datetime, UTC
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,28 +11,105 @@ from app.models.medical_record import MedicalRecord
 
 from app.models.user import Membership, User, Role
 from app.schemas.patient import (
+    PatientListItem, 
+    PatientListResponse,
+    PatientFilter,
+    PatientResponse, 
+    PatientDetail, 
     FamilyLinkCreate, 
     FamilyListItem, 
-    PatientResponse, 
-    PatientListItem, 
-    PatientDetail, 
     MedicalRecordSummary, 
     MedicalRecordPayload
 )
+from app.schemas.appointment import AppointmentListResponse, AppointmentFilter
 
 from app.utils.patient_code import generate_patient_code
 from app.utils.enums import (
     RoleEnum,
     FamilyRelationshipEnum, 
-    PatientCategoryEnum, 
     PatientStatusEnum, 
-    GenderEnum, 
-    BloodGroupEnum
 )
 from app.utils.reverse_relationship import get_reverse_relationship
 
+from app.api.v1.appointments.services import AppointmentService
+
 
 class PatientService:
+    
+    @staticmethod
+    async def _get_patient_or_404(
+        db: AsyncSession,
+        tenant_id: UUID,
+        patient_id: UUID,
+    ) -> Patient:  
+        query = (
+            select(Patient)
+            .join(MedicalRecord)
+            .where(
+                Patient.tenant_id == tenant_id,
+                Patient.id == patient_id
+            )
+            .options(
+                selectinload(Patient.medical_record)
+            )
+        )
+        result = await db.execute(query)
+        patient = result.scalar_one_or_none()
+        
+        if not patient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Patient not found"
+            )
+
+        return patient
+    
+    @staticmethod
+    async def _validate_doctor(
+        db: AsyncSession,
+        tenant_id: UUID,
+        doctor_id: UUID | None,
+    ) -> User | None:
+        """
+        Ensure assigned doctor exists and belongs to tenant.
+        """
+
+        if not doctor_id:
+            return None
+
+        result = await db.execute(
+            select(User)
+            .join(
+                Membership,
+                Membership.user_id == User.id,
+            )
+            .join(
+                Role,
+                Role.id == Membership.role_id,
+            )
+            .options(
+                selectinload(User.memberships)
+            )
+            .where(
+                User.id == doctor_id,
+                User.is_active.is_(True),
+
+                Membership.tenant_id == tenant_id,
+                Membership.is_active.is_(True),
+
+                Role.name == RoleEnum.DOCTOR.value,
+            )
+        )
+
+        doctor = result.scalar_one_or_none()
+
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Doctor not found",
+            )
+
+        return doctor
 
     @staticmethod
     async def create_patient(
@@ -92,7 +168,6 @@ class PatientService:
         # Commit Transaction
         try:
             await db.commit()
-
         except IntegrityError:
             await db.rollback()
             raise HTTPException(
@@ -101,51 +176,43 @@ class PatientService:
             )
         await db.refresh(new_patient)
         await db.refresh(medical_record)
-        return PatientResponse(
-            id=new_patient.id,
-            patient_code=new_patient.patient_code,
-            first_name=new_patient.first_name,
-            last_name=new_patient.last_name,
-            date_of_birth=new_patient.date_of_birth,
-            gender=new_patient.gender,
-            blood_group=new_patient.blood_group,
-            phone=new_patient.phone,
-            email=new_patient.email,
-            address=new_patient.address,
-            category=new_patient.category,
-            status=new_patient.status,
-            last_visit_at=new_patient.last_visit_at,
-            visit_count=new_patient.visit_count
+        return PatientResponse.model_validate(
+            new_patient
         )
     
     @staticmethod    
     async def list_patients(
         db: AsyncSession,
         tenant_id: UUID,
+        filter: PatientFilter,
         skip: int = 0,
         limit: int = 20,
-        category: PatientCategoryEnum | None = None,
-        status: PatientStatusEnum | None = None,
-        gender: GenderEnum | None = None,
-        blood_group: BloodGroupEnum | None = None,
-    ) -> list[PatientListItem]:
+    ) -> PatientListResponse:
         """List patients for the tenant with pagination"""
         filters = [
             Patient.tenant_id == tenant_id,
             Patient.status != PatientStatusEnum.INACTIVE
         ]
 
-        if category:
-            filters.append(Patient.category == category)
+        if filter.category:
+            filters.append(Patient.category == filter.category)
 
-        if status:
-            filters.append(Patient.status == status)
+        if filter.status:
+            filters.append(Patient.status == filter.status)
 
-        if gender:
-            filters.append(Patient.gender == gender)
+        if filter.gender:
+            filters.append(Patient.gender == filter.gender)
 
-        if blood_group:
-            filters.append(Patient.blood_group == blood_group)
+        if filter.blood_group:
+            filters.append(Patient.blood_group == filter.blood_group)
+            
+        total_query = (
+            select(func.count(Patient.id))
+            .where(*filters)
+        )
+
+        total_result = await db.execute(total_query)
+        total = total_result.scalar() or 0
 
         query = (
             select(Patient)
@@ -159,26 +226,21 @@ class PatientService:
             .limit(limit)
         )
         result = await db.execute(query)
-        patients = result.scalars().all()
+        patients = result.scalars().unique().all()
         
         if not patients:
             return []
-        return [
-            PatientListItem(
-                id=patient.id,
-                patient_code=patient.patient_code,
-                first_name=patient.first_name,
-                last_name=patient.last_name,
-                date_of_birth=patient.date_of_birth,   
-                gender=patient.gender,
-                blood_group=patient.blood_group,
-                phone=patient.phone,
-                email=patient.email,
-                address=patient.address,
-                category=patient.category,
-                status=patient.status,
-            ) for patient in patients
-        ]
+        return PatientListResponse(
+            items=[
+                PatientListItem.model_validate(
+                    patient
+                )
+                for patient in patients
+            ],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
         
     @staticmethod
     async def get_patient_by_id(
@@ -187,54 +249,14 @@ class PatientService:
         patient_id: UUID
     ) -> PatientDetail:
         """Get a specific patient by ID"""
-        query = (
-            select(Patient)
-            .join(MedicalRecord)
-            .where(
-                Patient.tenant_id == tenant_id,
-                Patient.id == patient_id
-            )
-            .options(
-                selectinload(Patient.medical_record)
-            )
+        patient = await PatientService._get_patient_or_404(
+            db=db,
+            tenant_id=tenant_id,
+            patient_id=patient_id
         )
-        result = await db.execute(query)
-        patient = result.scalars().first()
         
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Patient not found"
-            )
-        
-        return PatientDetail(
-            id=patient.id,
-            patient_code=patient.patient_code,
-            first_name=patient.first_name,
-            last_name=patient.last_name,
-            date_of_birth=patient.date_of_birth,
-            gender=patient.gender,
-            blood_group=patient.blood_group,
-            phone=patient.phone,
-            email=patient.email,
-            address=patient.address,
-            category=patient.category,
-            status=patient.status,
-            visit_count=patient.visit_count,
-            last_visit_at=patient.last_visit_at,
-            created_by_id=patient.created_by_id,
-            updated_by_id=patient.updated_by_id,
-            medical_record=MedicalRecordSummary(
-                id=patient.medical_record.id,
-                patient_id=patient.medical_record.patient_id,
-                primary_doctor_id=patient.medical_record.primary_doctor_id if patient.medical_record.primary_doctor_id else None,
-                systemic_conditions=patient.medical_record.systemic_conditions if patient.medical_record.systemic_conditions else None,
-                current_medications=patient.medical_record.current_medications if patient.medical_record.current_medications else None,
-                prior_surgeries=patient.medical_record.prior_surgeries if patient.medical_record.prior_surgeries else None,
-                emergency_contact_name=patient.medical_record.emergency_contact_name if patient.medical_record.emergency_contact_name else None,
-                emergency_contact_phone=patient.medical_record.emergency_contact_phone if patient.medical_record.emergency_contact_phone else None, 
-                allergies=patient.medical_record.allergies if patient.medical_record else None
-            ) if patient.medical_record else None,
+        return PatientDetail.model_validate(
+            patient
         )
     
     @staticmethod
@@ -265,19 +287,8 @@ class PatientService:
             return []
         
         return [
-            PatientListItem(
-                id=patient.id,
-                patient_code=patient.patient_code,
-                first_name=patient.first_name,
-                last_name=patient.last_name,
-                date_of_birth=patient.date_of_birth,
-                gender=patient.gender,
-                blood_group=patient.blood_group,
-                phone=patient.phone,
-                email=patient.email,
-                address=patient.address,
-                category=patient.category,
-                status=patient.status
+            PatientListItem.model_validate(
+                patient
             ) for patient in patients
         ]
         
@@ -320,31 +331,17 @@ class PatientService:
         payload: dict,
     ) -> PatientResponse:
         """Update patient details"""
-        query = (
-            select(Patient)
-            .where(
-                Patient.tenant_id == tenant_id,
-                Patient.id == patient_id
-            )
-            .options(
-                selectinload(Patient.medical_record)
-            )
+        patient = await PatientService._get_patient_or_404(
+            db=db,
+            tenant_id=tenant_id,
+            patient_id=patient_id
         )
-        result = await db.execute(query)
-        patient = result.scalars().first()
-        
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Patient not found"
-            )
         
         # Update patient fields
         for field, value in payload.items():
             if hasattr(patient, field) and value is not None:
                 setattr(patient, field, value)
         patient.updated_by_id = user_id
-        patient.updated_at = datetime.now(UTC)
         
         # Update medical record fields if present in payload
         # if patient.medical_record:
@@ -362,21 +359,8 @@ class PatientService:
                 detail="Failed to update patient due to integrity error."
             )
         await db.refresh(patient)
-        return PatientResponse(
-            id=patient.id,
-            patient_code=patient.patient_code,
-            first_name=patient.first_name,
-            last_name=patient.last_name,
-            date_of_birth=patient.date_of_birth,
-            gender=patient.gender,
-            blood_group=patient.blood_group,
-            phone=patient.phone,
-            email=patient.email,
-            address=patient.address,
-            category=patient.category,
-            status=patient.status,  
-            visit_count=patient.visit_count,
-            last_visit_at=patient.last_visit_at
+        return PatientResponse.model_validate(
+            patient
         )
         
     @staticmethod
@@ -387,24 +371,19 @@ class PatientService:
         patient_id: UUID
     ):
         """Soft delete a patient by setting status to INACTIVE"""
-        query = (
-            select(Patient)
-            .where(
-                Patient.tenant_id == tenant_id,
-                Patient.id == patient_id
-            )
+        patient = await PatientService._get_patient_or_404(
+            db=db,
+            tenant_id=tenant_id,
+            patient_id=patient_id
         )
-        result = await db.execute(query)
-        patient = result.scalars().first()
         
-        if not patient:
+        if patient.status == PatientStatusEnum.INACTIVE:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Patient not found"
-            )
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Patient is already inactive."
+            ) 
         
         patient.status = PatientStatusEnum.INACTIVE
-        patient.updated_at = datetime.now(UTC)
         patient.updated_by_id = user_id
         
         try:
@@ -414,6 +393,38 @@ class PatientService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to delete patient due to integrity error."
+            )
+            
+    @staticmethod
+    async def restore_patient(
+        db: AsyncSession,
+        tenant_id: UUID,
+        user_id: UUID,
+        patient_id: UUID
+    ):
+        """Restore soft deleted patient"""
+        patient = await PatientService._get_patient_or_404(
+            db=db,
+            tenant_id=tenant_id,
+            patient_id=patient_id
+        )
+        
+        if patient.status == PatientStatusEnum.ACTIVE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Patient is already restored."
+            ) 
+        
+        patient.status = PatientStatusEnum.ACTIVE
+        patient.updated_by_id = user_id
+        
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to restore patient due to integrity error."
             )
             
     @staticmethod
@@ -440,16 +451,8 @@ class PatientService:
                 detail="Medical record not found for this patient"
             )
         
-        return MedicalRecordSummary(
-            id=medical_record.id,
-            patient_id=medical_record.patient_id,
-            primary_doctor_id=medical_record.primary_doctor_id if medical_record.primary_doctor_id else None,
-            allergies=medical_record.allergies if medical_record.allergies else None,
-            systemic_conditions=medical_record.systemic_conditions if medical_record.systemic_conditions else None,
-            current_medications=medical_record.current_medications if medical_record.current_medications else None,
-            prior_surgeries=medical_record.prior_surgeries if medical_record.prior_surgeries else None,
-            emergency_contact_name=medical_record.emergency_contact_name if medical_record.emergency_contact_name else None,
-            emergency_contact_phone=medical_record.emergency_contact_phone if medical_record.emergency_contact_phone else None, 
+        return MedicalRecordSummary.model_validate(
+            medical_record
         )
         
     @staticmethod
@@ -503,16 +506,8 @@ class PatientService:
         
         await db.refresh(medical_record)
         
-        return MedicalRecordSummary(
-            id=medical_record.id,
-            patient_id=medical_record.patient_id,
-            primary_doctor_id=medical_record.primary_doctor_id if medical_record.primary_doctor_id else None,
-            allergies=medical_record.allergies if medical_record.allergies else None,
-            systemic_conditions=medical_record.systemic_conditions if medical_record.systemic_conditions else None,
-            current_medications=medical_record.current_medications if medical_record.current_medications else None,
-            prior_surgeries=medical_record.prior_surgeries if medical_record.prior_surgeries else None,
-            emergency_contact_name=medical_record.emergency_contact_name if medical_record.emergency_contact_name else None,
-            emergency_contact_phone=medical_record.emergency_contact_phone if medical_record.emergency_contact_phone else None, 
+        return MedicalRecordSummary.model_validate(
+            medical_record
         )
     
     @staticmethod
@@ -542,29 +537,11 @@ class PatientService:
             )
             
         # verify doctor exists and is active
-        doctor_query = (
-            select(User)
-            .join(Membership, Membership.user_id == User.id)
-            .join(Role, Role.id == Membership.role_id)
-            .options(selectinload(User.memberships))
-            .where(
-                User.id == doctor_id,
-                User.is_active == True,
-
-                Membership.tenant_id == tenant_id,
-                Membership.is_active == True,
-
-                Role.name == RoleEnum.DOCTOR.value
-            )
+        await PatientService._validate_doctor(
+            db=db,
+            tenant_id=tenant_id,
+            doctor_id=doctor_id
         )
-        doctor = await db.execute(doctor_query)
-        doctor = doctor.scalars().first()
-
-        if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Doctor not found or not active"
-            )
 
         medical_record.primary_doctor_id = doctor_id
         medical_record.updated_by_id = user_id
@@ -580,16 +557,8 @@ class PatientService:
         
         await db.refresh(medical_record)
         
-        return MedicalRecordSummary(
-            id=medical_record.id,
-            patient_id=medical_record.patient_id,
-            primary_doctor_id=medical_record.primary_doctor_id,
-            allergies=medical_record.allergies if medical_record.allergies else None,
-            systemic_conditions=medical_record.systemic_conditions if medical_record.systemic_conditions else None,
-            current_medications=medical_record.current_medications if medical_record.current_medications else None,
-            prior_surgeries=medical_record.prior_surgeries if medical_record.prior_surgeries else None,
-            emergency_contact_name=medical_record.emergency_contact_name if medical_record.emergency_contact_name else None,
-            emergency_contact_phone=medical_record.emergency_contact_phone if medical_record.emergency_contact_phone else None, 
+        return MedicalRecordSummary.model_validate(
+            medical_record
         )  
         
     @staticmethod
@@ -641,7 +610,7 @@ class PatientService:
         payload: FamilyLinkCreate
     ) -> FamilyListItem:
         """Link an existing patient as family member"""
-
+        
         # prevent self-linking
         if primary_account_id == payload.family_member_id:
             raise HTTPException(
@@ -658,7 +627,6 @@ class PatientService:
         )
 
         primary_patient = primary_patient_result.scalars().first()
-
         if not primary_patient:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -793,3 +761,32 @@ class PatientService:
         except Exception as e:
             await db.rollback()
             raise e
+        
+    @staticmethod
+    async def get_appointments(
+        db: AsyncSession,
+        tenant_id: UUID,
+        patient_id: UUID,
+        filter: AppointmentFilter,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> AppointmentListResponse:
+        """
+        List all appointments for a patient.
+        """
+
+        # ENSURE PATIENT EXISTS
+        await PatientService._get_patient_or_404(
+            db=db,
+            tenant_id=tenant_id,
+            patient_id=patient_id
+        )
+        
+        return await AppointmentService.list_patient_appointments(
+            db=db,
+            tenant_id=tenant_id,
+            patient_id=patient_id,
+            filter=filter,
+            skip=skip,
+            limit=limit
+        )

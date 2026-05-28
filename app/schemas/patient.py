@@ -1,8 +1,14 @@
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, field_validator
 
-from app.utils.enums import GenderEnum, BloodGroupEnum, PatientCategoryEnum, FamilyRelationshipEnum
+from app.utils.enums import (
+    GenderEnum, 
+    BloodGroupEnum, 
+    PatientCategoryEnum, 
+    PatientStatusEnum,
+    FamilyRelationshipEnum
+)
 
 class PatientCreate(BaseModel):
     first_name: str
@@ -55,8 +61,6 @@ class PatientUpdate(BaseModel):
         return v
 
 class PatientBase(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-     
     id: UUID
     patient_code: str
     first_name: str
@@ -68,25 +72,40 @@ class PatientBase(BaseModel):
     gender: GenderEnum
     blood_group: BloodGroupEnum | None
     category: PatientCategoryEnum
-    status: str | None  
+    status: PatientStatusEnum | None  
     
 class PatientResponse(PatientBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     visit_count: int
-    last_visit_at: str | None
+    last_visit_at: datetime | None
     
     # created_by_id: str | None
     # updated_by_id: str | None
-
-    class Config:
-        from_attributes = True
         
 class PatientListItem(PatientBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     pass
+
+class PatientListResponse(BaseModel):
+    items: list[PatientListItem]
+    total: int
+    skip: int
+    limit: int
+
+class PatientFilter(BaseModel):
+    category: PatientCategoryEnum | None = None
+    status: PatientStatusEnum | None = None
+    gender: GenderEnum | None = None
+    blood_group: BloodGroupEnum | None = None
 
 class PatientSearchResult(PatientListItem):
     pass
 
 class MedicalRecordSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+     
     id: UUID
     patient_id: UUID
     primary_doctor_id: UUID | None
@@ -117,16 +136,18 @@ class MedicalRecordPayload(BaseModel):
         return v
     
 class PatientDetail(PatientBase):
+    model_config = ConfigDict(from_attributes=True)
+     
     visit_count: int
-    last_visit_at: str | None
-    
-    created_by_id: UUID | None
-    updated_by_id: UUID | None
+    last_visit_at: datetime | None
     
     medical_record: MedicalRecordSummary | None
-    
-    model_config = ConfigDict(from_attributes=True)
    
+    created_by_id: UUID | None
+    updated_by_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+    
    
 class FamilyBase(BaseModel):
     id: UUID
