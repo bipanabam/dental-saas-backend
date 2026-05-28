@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -7,12 +7,13 @@ from app.utils.enums import (
     AppointmentTypeEnum,
     AppointmentStatusEnum,
     AppointmentSourceEnum,
+    AppointmentCancellationReasonEnum,
     AppointmentProcedureStatusEnum,
     PaymentStatusEnum,
+    QueueStatusEnum
 )
 
 from app.schemas.procedure import ProcedureCatalogMini
-
 
 
 class AppointmentProcedureBase(BaseModel):
@@ -66,7 +67,20 @@ class AppointmentCreate(BaseModel):
     procedures: list[AppointmentProcedureCreate] = Field(
         default_factory=list
     )
+    
 
+class AppointmentCreateWalkIn(BaseModel):
+    patient_id: UUID
+    doctor_id: UUID | None = None
+    duration_minutes: int = 30
+    chief_complaint: str | None = None
+    notes: str | None = None
+    source: AppointmentSourceEnum = (
+        AppointmentSourceEnum.FRONT_DESK
+    )
+    procedures: list[AppointmentProcedureCreate] = Field(
+        default_factory=list
+    )
 
 class AppointmentUpdate(BaseModel):
     doctor_id: UUID | None = None
@@ -136,13 +150,46 @@ class AppointmentDetail(BaseModel):
 
 
 class AppointmentFilter(BaseModel):
-    date_range: str | None = None
-    status: AppointmentStatusEnum | None = None
+    date_range: date | None = None
     doctor_id: UUID | None = None
-
+    status: AppointmentStatusEnum | None = None
+    appointment_type: AppointmentTypeEnum | None = None
+    source: AppointmentSourceEnum | None = None
 
 class AppointmentListResponse(BaseModel):
     items: list[AppointmentListItem]
     total: int
     skip: int
     limit: int
+    
+class AppointmentCancel(BaseModel):
+    cancellation_reason_type: (
+        AppointmentCancellationReasonEnum
+    )
+    cancellation_reason_note: str | None = None
+    
+class AppointmentCheckInResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+    appointment: AppointmentListItem
+
+    token_number: int
+
+    queue_id: UUID
+
+    queue_status: QueueStatusEnum
+    
+class AppointmentReschedule(BaseModel):
+    appointment_date: datetime
+    assigned_doctor_id: UUID | None = None
+    notes: str | None = None
+
+
+class AppointmentFollowUpCreate(BaseModel):
+    appointment_date: datetime
+    assigned_doctor_id: UUID | None = None
+
+    chief_complaint: str | None = None
+    notes: str | None = None

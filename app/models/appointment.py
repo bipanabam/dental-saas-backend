@@ -20,6 +20,7 @@ from app.utils.enums import (
     AppointmentTypeEnum,
     AppointmentStatusEnum,
     AppointmentSourceEnum,
+    AppointmentCancellationReasonEnum,
     AppointmentProcedureStatusEnum,
     PaymentStatusEnum,
 )
@@ -78,7 +79,17 @@ class Appointment(Base, BaseMixin):
         Enum(PaymentStatusEnum, name="payment_status_enum"),
         default=PaymentStatusEnum.PENDING,
     )
-    cancellation_reason: Mapped[str | None] = mapped_column(
+    
+    cancellation_reason_type: Mapped[
+        AppointmentCancellationReasonEnum | None
+    ] = mapped_column(
+        Enum(
+            AppointmentCancellationReasonEnum,
+            name="appointment_cancellation_reason_enum",
+        ),
+        nullable=True,
+    )
+    cancellation_reason_note: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )

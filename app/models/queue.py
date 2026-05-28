@@ -4,7 +4,8 @@ import uuid
 from sqlalchemy import (
     Enum,
     ForeignKey,
-    UniqueConstraint
+    UniqueConstraint,
+    DateTime
 )
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -44,17 +45,33 @@ class Queue(Base, BaseMixin):
         default=QueueStatusEnum.WAITING,
     )
 
-    called_at: Mapped[datetime | None]
-    started_at: Mapped[datetime | None]
-    completed_at: Mapped[datetime | None]
+    called_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     appointment = relationship(
         "Appointment",
         back_populates="queue_entry",
     )
     
-    UniqueConstraint(
-        "tenant_id",
-        "queue_date",
-        "token_number",
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "queue_date",
+            "token_number",
+            name="uq_queue_token_per_day",
+        ),
     )

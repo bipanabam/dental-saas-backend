@@ -60,11 +60,13 @@ class AppointmentTypeEnum(str, Enum):
     BOOKED = "BOOKED"
     WALK_IN = "WALK_IN"
     FOLLOW_UP = "FOLLOW_UP"
+    RESCHEDULED = "RESCHEDULED"
 
 
 class AppointmentStatusEnum(str, Enum):
     BOOKED = "BOOKED"
     CONFIRMED = "CONFIRMED"
+    CHECKED_IN = "CHECKED_IN"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     NO_SHOW = "NO_SHOW"
@@ -77,6 +79,15 @@ class AppointmentSourceEnum(str, Enum):
     WHATSAPP = "WHATSAPP"
     INSTAGRAM = "INSTAGRAM"
     FRONT_DESK = "FRONT_DESK"
+    
+class AppointmentCancellationReasonEnum(str, Enum):
+    PATIENT_CANCELLED = "PATIENT_CANCELLED"
+    DOCTOR_UNAVAILABLE = "DOCTOR_UNAVAILABLE"
+    NO_SHOW = "NO_SHOW"
+    RESCHEDULED = "RESCHEDULED"
+    DUPLICATE_BOOKING = "DUPLICATE_BOOKING"
+    EMERGENCY = "EMERGENCY"
+    OTHER = "OTHER"
     
 class AppointmentProcedureStatusEnum(str, Enum):
     PLANNED = "planned"
@@ -95,7 +106,9 @@ class QueueStatusEnum(str, Enum):
     WAITING = "WAITING"
     CALLED = "CALLED"
     IN_PROGRESS = "IN_PROGRESS"
-    DONE = "DONE"
+    COMPLETED = "COMPLETED"
+    NO_SHOW = "NO_SHOW"
+    CANCELLED = "CANCELLED"
     SKIPPED = "SKIPPED"
 
 class ProcedureStatusEnum(str, Enum):
