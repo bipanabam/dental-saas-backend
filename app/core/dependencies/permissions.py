@@ -44,3 +44,10 @@ CanReadAppointments = require_permissions("appointments.read")
 CanUpdateAppointments = require_permissions("appointments.update")
 CanDeleteAppointments = require_permissions("appointments.delete")
 CanCheckInAppointments = require_permissions("appointments.checkin")
+CanCompleteAppointments = require_permissions("appointments.complete")
+
+# Queue
+CanCreateQueue = require_permissions("queue.create")
+CanReadQueue = require_permissions("queue.read")
+CanUpdateQueue = require_permissions("queue.update")
+CanDeleteQueue = require_permissions("queue.delete")

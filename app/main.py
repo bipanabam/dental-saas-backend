@@ -9,6 +9,7 @@ from app.api.v1.auth.router import router as auth_router
 from app.api.v1.users.router import router as users_router
 from app.api.v1.patients.router import router as patients_router
 from app.api.v1.appointments.router import router as appointment_router
+from app.api.v1.queue.router import router as queue_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -29,6 +30,7 @@ app.include_router(auth_router, prefix=settings.API_PREFIX)
 app.include_router(users_router, prefix=settings.API_PREFIX)
 app.include_router(patients_router, prefix=settings.API_PREFIX)
 app.include_router(appointment_router, prefix=settings.API_PREFIX)
+app.include_router(queue_router, prefix=settings.API_PREFIX)
 
 @app.get("/healthz")
 async def read_root() -> dict[str, str]:

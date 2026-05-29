@@ -12,10 +12,12 @@ from app.core.dependencies.permissions import (
     CanReadAppointments,
     CanCreateAppointments,
     CanUpdateAppointments,
-    CanDeleteAppointments
+    CanDeleteAppointments,
+    CanCheckInAppointments,
+    CanCompleteAppointments
 )
 
-from app.api.v1.appointments.services import AppointmentService, AppointmentWorkflowService
+from app.services.appointment import AppointmentService, AppointmentWorkflowService
 
 from app.schemas.appointment import (
     AppointmentListResponse,
@@ -191,6 +193,7 @@ async def confirm_appointment(
     appointment_id: UUID,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: None = CanUpdateAppointments,
 ):
     """Confirm booked appointment"""
     return await AppointmentWorkflowService.confirm_appointment(
@@ -208,6 +211,7 @@ async def check_in_appointment(
     appointment_id: UUID,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: None = CanCheckInAppointments,
 ):
     """Check-in for scheduled appointment with token in return"""
     return await AppointmentWorkflowService.check_in_appointment(
@@ -225,6 +229,7 @@ async def start_appointment(
     appointment_id: UUID,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: None = CanUpdateAppointments,
 ):
     """Start appointment with all the planned procedure it consists of"""
     return await AppointmentWorkflowService.start_appointment(
@@ -242,6 +247,7 @@ async def complete_appointment(
     appointment_id: UUID,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: None = CanCompleteAppointments,
 ):
     """Set the given appointment as completed"""
     return await AppointmentWorkflowService.complete_appointment(
@@ -259,6 +265,7 @@ async def mark_no_show(
     appointment_id: UUID,
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: None = CanUpdateAppointments,
 ):
     return await AppointmentWorkflowService.mark_no_show(
         db=db,
@@ -277,6 +284,7 @@ async def reschedule_appointment(
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
     payload: AppointmentReschedule,
+    _: None = CanCreateAppointments,
 ):
     """Reschedule appointment with updated doctor and appointment_date"""
     return await AppointmentWorkflowService.reschedule_appointment(
@@ -297,6 +305,7 @@ async def create_follow_up(
     auth: CurrentAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
     payload: AppointmentFollowUpCreate,
+    _: None = CanCreateAppointments,
 ):
     """create follow up for previous appointment"""
     return await AppointmentWorkflowService.create_follow_up(

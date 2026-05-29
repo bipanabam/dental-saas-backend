@@ -36,7 +36,7 @@ from app.utils.enums import (
 )
 from app.utils.reverse_relationship import get_reverse_relationship
 
-from app.api.v1.appointments.services import AppointmentService
+from app.services.appointment import AppointmentService
 
 
 class PatientService:

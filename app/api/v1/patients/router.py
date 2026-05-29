@@ -30,7 +30,7 @@ from app.schemas.patient import (
 from app.schemas.appointment import AppointmentListResponse, AppointmentFilter
 from app.core.database import AsyncSession, get_db  
 
-from app.api.v1.patients.services import PatientService
+from app.services.patient import PatientService
 
 
 router = APIRouter(

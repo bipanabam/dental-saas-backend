@@ -75,3 +75,9 @@ class Queue(Base, BaseMixin):
             name="uq_queue_token_per_day",
         ),
     )
+    
+    
+# queue.mark_skipped()
+# queue.mark_waiting()
+# queue.mark_in_progress()
+# queue.mark_completed()
