@@ -107,10 +107,10 @@ class Procedure(Base, BaseMixin):
         ForeignKey("appointments.id", ondelete="SET NULL"),
         nullable=True,
     )
-    # treatment_plan_id: Mapped[uuid.UUID | None] = mapped_column(
-    #     ForeignKey("treatment_plans.id", ondelete="SET NULL"),
-    #     nullable=True,
-    # )
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("clinical_encounters.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     procedure_catalog_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("procedure_catalogs.id", ondelete="SET NULL"),
@@ -170,6 +170,10 @@ class Procedure(Base, BaseMixin):
     )
     appointment_procedure = relationship(
         "AppointmentProcedure",
+        back_populates="procedures",
+    )
+    encounter = relationship(
+        "ClinicalEncounter",
         back_populates="procedures",
     )
     procedure_catalog = relationship(

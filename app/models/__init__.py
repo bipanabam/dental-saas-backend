@@ -5,3 +5,4 @@ from app.models.medical_record import MedicalRecord
 from app.models.appointment import Appointment, AppointmentProcedure, AppointmentCancellationReasonEnum, AppointmentStatusEnum, AppointmentTypeEnum, AppointmentProcedureStatusEnum, AppointmentSourceEnum
 from app.models.queue import Queue, QueueStatusEnum
 from app.models.procedure import ProcedureCatalog, Procedure, ProcedureCategoryEnum, ProcedureStatusEnum
+from app.models.encounter import ClinicalEncounter, EncounterMedicalHistory, ClinicalExaminationEntry, ClinicalFinding, EncounterDiagnosis, Investigation, TreatmentPlan, TreatmentPlanItem

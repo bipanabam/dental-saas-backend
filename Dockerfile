@@ -1,4 +1,4 @@
-FROM python:3.13.2-slim-bullseye
+FROM python:3.12-slim
 
 RUN python -m venv /opt/venv
 
@@ -25,11 +25,12 @@ RUN mkdir -p /code
 
 WORKDIR /code
 
-COPY requirements.txt /tmp/requirements.txt
+COPY requirements.txt .
+
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . /code
-
-RUN pip install -r /tmp/requirements.txt
 
 # make the bash script executable
 COPY ./boot/docker-run.sh /opt/run.sh

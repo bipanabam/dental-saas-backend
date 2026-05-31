@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env.dev",
+        env_file=".env",
         env_file_encoding="utf-8",
     )
 
@@ -13,6 +13,16 @@ class Settings(BaseSettings):
         "A digital system where you can manage your patients and appointments"
     )
     API_PREFIX: str = "/api/v1"
+    
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ]
+    
+    ALLOWED_HOSTS: list[str] = [
+        "localhost",
+        "127.0.0.1",
+    ]
 
     DEBUG: bool = False
     ENV: str = "dev"

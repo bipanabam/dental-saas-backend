@@ -125,11 +125,11 @@ class ClinicalEncounter(Base, BaseMixin):
         "Procedure",
         back_populates="encounter",
     )
-    prescriptions = relationship(
-        "Prescription",
-        back_populates="encounter",
-        cascade="all, delete-orphan",
-    )
+    # prescriptions = relationship(
+    #     "Prescription",
+    #     back_populates="encounter",
+    #     cascade="all, delete-orphan",       
+    # )
 
     __table_args__ = (
         Index("ix_encounters_tenant_patient", "tenant_id", "patient_id"),

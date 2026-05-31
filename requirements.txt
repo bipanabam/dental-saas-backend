@@ -4,3 +4,5 @@ psycopg[binary]>=3.3.4
 pwdlib[argon2]>=0.3.0
 pyjwt>=2.12.1
 alembic>=1.18.4
+gunicorn>=26.0.0
+uvicorn[standard]>=0.47.0
