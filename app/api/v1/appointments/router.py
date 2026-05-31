@@ -36,7 +36,7 @@ from app.schemas.appointment import (
 
 router = APIRouter(
     prefix="/appointments",
-    tags=["appointments"],
+    tags=["Appointments"],
 )
 
 # GET -> /appointments

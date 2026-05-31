@@ -53,7 +53,7 @@ from app.utils.enums import (
 
 class EncounterService:
 
-    # ─── INTERNAL HELPERS ───────────────────────────────────
+    # INTERNAL HELPERS
 
     @staticmethod
     async def _get_encounter_or_404(

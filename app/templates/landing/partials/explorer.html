@@ -1,0 +1,163 @@
+<section id="api-explorer" class="py-24 relative border-b border-outline-variant/20 bg-surface-container-lowest">
+    <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="inline-flex items-center px-3 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary font-label-caps text-xs tracking-wider uppercase">
+                Interactive API Blueprint
+            </div>
+            <h2 class="mt-4 font-headline-lg text-3xl md:text-4xl text-on-surface font-bold tracking-tight">
+                Explore Core Clinical Operations
+            </h2>
+            <p class="mt-2 text-body-md text-on-surface-variant">
+                See how intuitively our unified clinical engine maps to complex workflows. Select an operational endpoint to view the schema signature.
+            </p>
+        </div>
+
+        <!-- Interactive Playground Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            
+            <!-- Sidebar Controllers -->
+            <div class="lg:col-span-4 flex flex-col gap-3">
+                <button 
+                    onclick="switchEndpoint('patient')" 
+                    id="btn-patient"
+                    class="endpoint-btn w-full p-4 rounded-xl text-left border bg-surface-container border-outline-variant/30 text-on-surface transition-all duration-200 hover:border-primary/40 group"
+                >
+                    <div class="flex items-center justify-between">
+                        <span class="font-label-caps text-[11px] text-primary tracking-widest uppercase">POST</span>
+                        <span class="text-xs font-mono text-on-surface-variant/40 group-hover:text-primary/70">11ms</span>
+                    </div>
+                    <div class="text-sm font-semibold mt-1 font-headline-md">/v1/patients</div>
+                    <p class="text-xs text-on-surface-variant/70 mt-1">Register single patient entity with insurance vectors.</p>
+                </button>
+
+                <button 
+                    onclick="switchEndpoint('encounter')" 
+                    id="btn-encounter"
+                    class="endpoint-btn w-full p-4 rounded-xl text-left border bg-surface border-transparent text-on-surface-variant transition-all duration-200 hover:bg-surface-container/50 group"
+                >
+                    <div class="flex items-center justify-between">
+                        <span class="font-label-caps text-[11px] text-teal-400 tracking-widest uppercase">POST</span>
+                        <span class="text-xs font-mono text-on-surface-variant/40">14ms</span>
+                    </div>
+                    <div class="text-sm font-semibold mt-1 font-headline-md text-on-surface">/v1/clinical/encounters</div>
+                    <p class="text-xs text-on-surface-variant/70 mt-1">Initialize dynamic exam state logs & charting hooks.</p>
+                </button>
+
+                <button 
+                    onclick="switchEndpoint('billing')" 
+                    id="btn-billing"
+                    class="endpoint-btn w-full p-4 rounded-xl text-left border bg-surface border-transparent text-on-surface-variant transition-all duration-200 hover:bg-surface-container/50 group"
+                >
+                    <div class="flex items-center justify-between">
+                        <span class="font-label-caps text-[11px] text-amber-400 tracking-widest uppercase">POST</span>
+                        <span class="text-xs font-mono text-on-surface-variant/40">19ms</span>
+                    </div>
+                    <div class="text-sm font-semibold mt-1 font-headline-md text-on-surface">/v1/billing/claims</div>
+                    <p class="text-xs text-on-surface-variant/70 mt-1">Compile HIPAA-compliant EDI 837D outbound batches.</p>
+                </button>
+            </div>
+
+            <!-- Display Code Console Container -->
+            <div class="lg:col-span-8 bg-surface-container border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden min-h-[420px]">
+                <!-- Header Status Bar -->
+                <div class="bg-surface-container-high px-4 py-3 border-b border-outline-variant/30 flex items-center justify-between text-xs font-label-caps">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span id="current-path" class="text-on-surface font-mono">/v1/clinical/patients</span>
+                    </div>
+                    <div class="text-on-surface-variant/60">STATUS: <span class="text-emerald-400 font-bold">201 CREATED</span></div>
+                </div>
+
+                <!-- Code Screen Blocks -->
+                <div class="p-5 flex-1 font-label-caps text-xs overflow-auto bg-surface-container-lowest/50 select-all">
+                    <pre><code id="json-display" class="text-primary leading-relaxed"></code></pre>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- Lightweight Interactive Script Handler -->
+<script>
+    const schemas = {
+        patient: {
+            path: "/v1/patients",
+            data: {
+                "id": "pat_01JK87ZE",
+                "object": "patient",
+                "created_at": 1774984211,
+                "first_name": "Sarah",
+                "last_name": "Chen",
+                "date_of_birth": "1991-05-31",
+                "gender": "FEMALE",
+                "blood_group": "A+",
+                "phone": "9812345678",
+                "email": "sarah@gmail.com",
+                "address": "string",
+                "category": "REGULAR",
+                "allergies": "string",
+                "status": "active",
+                "primary_insurance": {
+                    "provider_id": "ins_delta_99",
+                    "policy_number": "DENT-88491A",
+                    "group_number": "CA-CLINIC-01"
+                },
+                "metadata": {
+                    "origin_source": "headless_api_onboarding"
+                }
+            }
+        },
+        encounter: {
+            path: "/v1/clinical/encounters",
+            data: {
+                "id": "enc_01JK89AA",
+                "object": "encounter",
+                "patient_id": "pat_01JK87ZE",
+                "provider_id": "prov_dr_basnet",
+                "status": "in_progress",
+                "assessment": {
+                    "chief_complaint": "Localized sensitivity on lower left quadrant",
+                    "diagnoses": ["Caries - Tooth #19 (Mesa-occlusal)"]
+                },
+                "procedures_logged": [
+                    {"cdt_code": "D2393", "surface": "MO", "tooth_number": 19}
+                ]
+            }
+        },
+        billing: {
+            path: "/v1/billing/claims",
+            data: {
+                "id": "clm_01JK91BB",
+                "object": "claim",
+                "encounter_id": "enc_01JK89AA",
+                "clearinghouse_route": "change_healthcare",
+                "edi_transmission_status": "queued",
+                "financials": {
+                    "total_charge_cents": 28500,
+                    "expected_insurance_coverage_cents": 22800,
+                    "patient_responsibility_cents": 5700
+                }
+            }
+        }
+    };
+
+    function switchEndpoint(key) {
+        // Update styling states for interactive tabs
+        document.querySelectorAll('.endpoint-btn').forEach(btn => {
+            btn.classList.remove('bg-surface-container', 'border-outline-variant/30');
+            btn.classList.add('bg-surface', 'border-transparent');
+        });
+        
+        const targetBtn = document.getElementById(`btn-${key}`);
+        targetBtn.classList.remove('bg-surface', 'border-transparent');
+        targetBtn.classList.add('bg-surface-container', 'border-outline-variant/30');
+
+        // Swap terminal code text content strings
+        document.getElementById('current-path').textContent = schemas[key].path;
+        document.getElementById('json-display').textContent = JSON.stringify(schemas[key].data, null, 4);
+    }
+
+    // Run primary initial setup load
+    switchEndpoint('patient');
+</script>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>DentoCore: Dental Practice Management Platform</title>
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+    <link
+        href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#303b3b",
+                    "surface-dim": "#0a1515",
+                    "inverse-on-surface": "#273232",
+                    "on-error": "#690005",
+                    "surface-container-low": "#121d1d",
+                    "surface-tint": "#66d9cc",
+                    "tertiary": "#8fd3ce",
+                    "on-surface": "#d8e5e4",
+                    "background": "#0a1515",
+                    "tertiary-container": "#5da09c",
+                    "surface-variant": "#2b3737",
+                    "on-background": "#d8e5e4",
+                    "error": "#ffb4ab",
+                    "surface-container-highest": "#2b3737",
+                    "secondary": "#76d7cc",
+                    "on-primary-fixed-variant": "#005049",
+                    "secondary-fixed": "#93f3e8",
+                    "tertiary-fixed-dim": "#8fd3ce",
+                    "primary-container": "#26a69a",
+                    "on-primary": "#003732",
+                    "surface-container": "#162221",
+                    "inverse-primary": "#006a62",
+                    "on-tertiary": "#003735",
+                    "surface-container-high": "#212c2c",
+                    "surface-container-lowest": "#051010",
+                    "on-secondary-container": "#dffffa",
+                    "on-primary-fixed": "#00201d",
+                    "inverse-surface": "#d8e5e4",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary": "#003733",
+                    "primary-fixed": "#84f5e8",
+                    "on-secondary-fixed": "#00201d",
+                    "on-secondary-fixed-variant": "#00504a",
+                    "on-tertiary-fixed": "#00201f",
+                    "primary": "#66d9cc",
+                    "on-primary-container": "#003430",
+                    "secondary-fixed-dim": "#76d7cc",
+                    "error-container": "#93000a",
+                    "primary-fixed-dim": "#66d9cc",
+                    "tertiary-fixed": "#abefea",
+                    "secondary-container": "#008077",
+                    "outline-variant": "#3d4947",
+                    "surface": "#0a1515",
+                    "on-tertiary-fixed-variant": "#00504d",
+                    "outline": "#869391",
+                    "on-surface-variant": "#bcc9c6",
+                    "on-tertiary-container": "#003432"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "1.5rem",
+                    "stack-lg": "2rem",
+                    "stack-sm": "0.5rem",
+                    "base": "4px",
+                    "container-padding": "2rem",
+                    "stack-md": "1rem"
+            },
+            "fontFamily": {
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Geist"],
+                    "body-sm": ["Inter"],
+                    "headline-lg": ["Geist"],
+                    "display-lg": ["Geist"],
+                    "headline-lg-mobile": ["Geist"],
+                    "body-md": ["Inter"],
+                    "label-caps": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+
+    <style>
+        .glass-card {
+            background: rgba(15, 31, 30, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .section-title {
+            @apply font-headline-lg text-headline-lg text-on-surface;
+        }
+
+        .section-subtitle {
+            @apply text-body-lg text-on-surface-variant;
+        }
+
+        .hero-gradient {
+            background:
+                radial-gradient(
+                    circle at 50% 50%,
+                    rgba(38,166,154,0.15) 0%,
+                    rgba(7,18,18,0) 70%
+                );
+        }
+
+        .feature-card {
+            background: rgba(15,31,30,.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,.08);
+
+            border-radius: 1rem;
+            padding: 2rem;
+
+            transition: all .3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: rgb(102 217 204 / .4);
+            transform: translateY(-4px);
+        }
+
+        .grid-pattern {
+            background-image:
+                linear-gradient(
+                    rgba(255,255,255,0.03) 1px,
+                    transparent 1px
+                ),
+                linear-gradient(
+                    90deg,
+                    rgba(255,255,255,0.03) 1px,
+                    transparent 1px
+                );
+
+            background-size: 32px 32px;
+        }
+        /* Edge mask to fade logos out smoothly on the container boundaries */
+        .mask-linear-edges {
+            mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent);
+        }
+
+        /* Fluid infinite translation loop animation */
+        @keyframes marquee-slide {
+            0% { transform: translateX(0%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .animate-marquee {
+            animation: marquee-slide 25s linear infinite;
+        }
+
+        /* Pause layout movement when a developer hovers over a brand token */
+        .group:hover .animate-marquee {
+            animation-play-state: paused;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 font-[Inter]">
+
+    {% include "landing/partials/navbar.html" %}
+    {% include "landing/partials/hero.html" %}
+    {% include "landing/partials/socialproof.html" %}
+    {% include "landing/partials/status.html" %}
+    {% include "landing/partials/workflow.html" %}
+    {% include "landing/partials/features.html" %}
+    {% include "landing/partials/explorer.html" %}
+    <!--{% include "landing/partials/integrations.html" %}-->
+    {% include "landing/partials/roles.html" %}
+    {% include "landing/partials/residency.html" %}
+    {% include "landing/partials/security.html" %}
+    {% include "landing/partials/techstack.html" %}
+    {% include "landing/partials/cta.html" %}
+    {% include "landing/partials/footer.html" %}
+
+</body>
+</html>

@@ -38,7 +38,7 @@ from app.models import User
 
 router = APIRouter(
     prefix="/auth",
-    tags=["auth"],
+    tags=["Auth"],
 )
 
 # POST -> /auth/register-tenant

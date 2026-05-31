@@ -35,7 +35,7 @@ from app.services.patient import PatientService
 
 router = APIRouter(
     prefix="/patients",
-    tags=["patients"],
+    tags=["Patients"],
 )
 
 # GET -> /patients

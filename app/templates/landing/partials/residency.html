@@ -1,0 +1,57 @@
+<section id="residency" class="py-24 relative border-b border-outline-variant/20 bg-surface">
+    <div class="max-w-6xl mx-auto px-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            <div class="lg:col-span-5 space-y-6">
+                <div class="inline-flex items-center px-3 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary font-label-caps text-xs tracking-wider uppercase">
+                    Isolation Architecture
+                </div>
+                <h2 class="font-headline-lg text-3xl md:text-4xl text-on-surface tracking-tight font-bold">
+                    Zero-Shared Data State. Separate Environments.
+                </h2>
+                <p class="text-body-md text-on-surface-variant leading-relaxed">
+                    DentoCore enforces strict logical and physical data isolation boundaries out of the box. Mitigate cross-tenant leak vectors completely via dynamic pool allocation or dedicated siloed database schemas.
+                </p>
+                
+                <ul class="space-y-3 font-body-sm text-on-surface-variant">
+                    <li class="flex items-center gap-3">
+                        <span class="text-primary font-bold">✓</span> Regional storage matching HIPAA & GDPR spatial parameters
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <span class="text-primary font-bold">✓</span> Independent KMS cryptographic envelope keys per practice group
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <span class="text-primary font-bold">✓</span> Real-time point-in-time recovery (PITR) logs separated at rest
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Visual representation of the isolated database architecture -->
+            <div class="lg:col-span-7 bg-surface-container border border-outline-variant/30 rounded-2xl p-6 relative overflow-hidden">
+                <div class="absolute inset-0 grid-pattern opacity-40"></div>
+                
+                <div class="relative space-y-4">
+                    <div class="flex items-center justify-between border-b border-outline-variant/30 pb-4">
+                        <span class="font-label-caps text-xs text-primary tracking-widest uppercase">Multi-Tenant Routing Policy</span>
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-xl bg-surface-container-high border border-outline-variant/40 space-y-2">
+                            <div class="text-xs font-label-caps text-on-surface-variant/60">TENANT_ID: US_EAST_01</div>
+                            <div class="text-sm font-semibold text-on-surface">AWS us-east-1 (Virginia)</div>
+                            <div class="text-xs text-emerald-400 font-mono">Status: Enforced isolated pool</div>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-surface-container-high border border-outline-variant/40 space-y-2">
+                            <div class="text-xs font-label-caps text-on-surface-variant/60">TENANT_ID: EU_WEST_02</div>
+                            <div class="text-sm font-semibold text-on-surface">AWS eu-west-1 (Ireland)</div>
+                            <div class="text-xs text-emerald-400 font-mono">Status: GDPR Sovereign DB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>

@@ -31,7 +31,7 @@ from app.schemas.encounter import (
 )
 from app.services.encounter import EncounterService
 
-router = APIRouter(prefix="/encounters", tags=["Clinical Encounter"])
+router = APIRouter(prefix="/encounters", tags=["Clinical Encounter (Working)"])
 
 
 @router.get(

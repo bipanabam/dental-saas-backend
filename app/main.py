@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
 from app.core.database import engine
@@ -27,12 +28,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+templates = Jinja2Templates(directory="app/templates")
+
 app.include_router(auth_router, prefix=settings.API_PREFIX)
 app.include_router(users_router, prefix=settings.API_PREFIX)
 app.include_router(patients_router, prefix=settings.API_PREFIX)
 app.include_router(appointment_router, prefix=settings.API_PREFIX)
 app.include_router(queue_router, prefix=settings.API_PREFIX)
 app.include_router(encounter_router, prefix=settings.API_PREFIX)
+
+@app.get("/", include_in_schema=False)
+def home(request: Request):
+    return templates.TemplateResponse(request, name="landing/index.html")
 
 @app.get("/healthz")
 async def read_root() -> dict[str, str]:

@@ -25,7 +25,7 @@ from app.schemas.queue import (
 
 router = APIRouter(
     prefix="/queue",
-    tags=["queue"],
+    tags=["Queue"],
 )
 
 # GET -> /queue/today

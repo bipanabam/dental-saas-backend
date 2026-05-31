@@ -1,0 +1,110 @@
+
+<!-- ROLES & SECURITY GOVERNANCE SECTION -->
+<section class="py-32 bg-surface-container-lowest grid-pattern relative border-b border-outline-variant/20">
+    <div class="max-w-7xl mx-auto px-6">
+        
+        <div class="text-center mb-20">
+            <span class="inline-flex items-center px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-label-caps text-label-caps">
+                RBAC Access Control
+            </span>
+            <h2 class="text-4xl md:text-5xl font-headline-lg font-bold mt-4 text-on-surface tracking-tight">
+                Cryptographic Role Isolation
+            </h2>
+            <p class="mt-4 text-lg font-body-lg text-on-surface-variant max-w-3xl mx-auto">
+                Security and trust aren't add-ons. DentoCore enforces runtime data scope isolation explicitly built on top of your standard database primitives.
+            </p>
+        </div>
+
+        <!-- Role Execution Matrix Matrix -->
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 font-label-caps text-label-caps">
+            
+            <!-- Role 1: Superadmin -->
+            <div class="glass-card rounded-2xl p-5 border border-outline-variant/20 bg-surface-container/30 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold text-red-400 tracking-wider bg-red-400/10 px-2 py-0.5 rounded border border-red-500/20">SUPERADMIN</span>
+                        <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                    </div>
+                    <h4 class="text-base font-semibold text-on-surface font-headline-md tracking-normal normal-case">Network Operator</h4>
+                    <p class="mt-2 text-xs text-on-surface-variant normal-case font-body-sm leading-relaxed">
+                        Full multi-tenant tenant management, cross-clinic ledger queries, schema initialization controls, and Global App Configurations.
+                    </p>
+                </div>
+                <div class="mt-6 pt-3 border-t border-outline-variant/20 text-[10px] text-on-surface-variant/50">
+                    Scope: `*:*` (Root)
+                </div>
+            </div>
+
+            <!-- Role 2: Admin -->
+            <div class="glass-card rounded-2xl p-5 border border-outline-variant/20 bg-surface-container/30 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold text-amber-400 tracking-wider bg-amber-400/10 px-2 py-0.5 rounded border border-amber-500/20">ADMIN</span>
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    </div>
+                    <h4 class="text-base font-semibold text-on-surface font-headline-md tracking-normal normal-case">Clinic Manager</h4>
+                    <p class="mt-2 text-xs text-on-surface-variant normal-case font-body-sm leading-relaxed">
+                        Manages local practitioners, overrides financial anomalies, adjusts queue configurations, and reads system analytical telemetry.
+                    </p>
+                </div>
+                <div class="mt-6 pt-3 border-t border-outline-variant/20 text-[10px] text-on-surface-variant/50">
+                    Scope: `clinic:write`, `billing:read`
+                </div>
+            </div>
+
+            <!-- Role 3: Doctor -->
+            <div class="glass-card rounded-2xl p-5 border border-outline-variant/30 bg-primary/5 shadow-lg shadow-primary/5 flex flex-col justify-between transform -translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold text-primary tracking-wider bg-primary/20 px-2 py-0.5 rounded border border-primary/30">DOCTOR</span>
+                        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                    </div>
+                    <h4 class="text-base font-semibold text-on-surface font-headline-md tracking-normal normal-case">Practitioner Core</h4>
+                    <p class="mt-2 text-xs text-on-surface-variant normal-case font-body-sm leading-relaxed">
+                        Unrestricted read/write paths across treatment logs, patient medical records, charting interfaces, and clinical encounter workflows.
+                    </p>
+                </div>
+                <div class="mt-6 pt-3 border-t border-outline-variant/20 text-[10px] text-primary/70">
+                    Scope: `encounter:write`, `patient:chart`
+                </div>
+            </div>
+
+            <!-- Role 4: Receptionist -->
+            <div class="glass-card rounded-2xl p-5 border border-outline-variant/20 bg-surface-container/30 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold text-sky-400 tracking-wider bg-sky-400/10 px-2 py-0.5 rounded border border-sky-500/20">RECEPTIONIST</span>
+                        <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                    </div>
+                    <h4 class="text-base font-semibold text-on-surface font-headline-md tracking-normal normal-case">Front-Desk Dispatch</h4>
+                    <p class="mt-2 text-xs text-on-surface-variant normal-case font-body-sm leading-relaxed">
+                        Executes registration pipelines, initializes slot reservation, generates tracking tokens, and handles direct checkout invoicing operations.
+                    </p>
+                </div>
+                <div class="mt-6 pt-3 border-t border-outline-variant/20 text-[10px] text-on-surface-variant/50">
+                    Scope: `patient:create`, `queue:mutate`
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Trust Subtext / Proof Section -->
+        <div class="mt-16 bg-surface-container/40 rounded-2xl p-6 border border-outline-variant/20 flex flex-wrap items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+                <div>
+                    <h5 class="text-sm font-semibold text-on-surface font-body-md">Compliant Data Isolation Guarantees</h5>
+                    <p class="text-xs text-on-surface-variant font-body-sm mt-0.5">Tokens expire automatically. Database queries explicitly map roles using localized route dependency injections.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 text-xs font-label-caps text-on-surface-variant/40">
+                <span>HIPAA READY</span>
+                <span>•</span>
+                <span>SOC2 COMPLIANT SCHEMA</span>
+            </div>
+        </div>
+
+    </div>
+</section>
