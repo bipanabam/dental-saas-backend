@@ -83,6 +83,12 @@ class Patient(Base, BaseMixin):
         "Appointment",
         back_populates="patient",
     )
+    encounters = relationship(
+        "ClinicalEncounter",
+        back_populates="patient",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
         
     __table_args__ = (
         UniqueConstraint(

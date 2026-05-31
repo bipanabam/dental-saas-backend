@@ -128,10 +128,15 @@ class Appointment(Base, BaseMixin):
         "Patient",
         back_populates="appointments",
     )
-
     doctor = relationship(
         "User",
         foreign_keys=[assigned_doctor_id],
+    )
+    encounter = relationship(
+        "ClinicalEncounter",
+        back_populates="appointment",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 

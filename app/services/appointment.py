@@ -2,7 +2,7 @@ from uuid import UUID
 from datetime import datetime, UTC, date
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
@@ -14,6 +14,7 @@ from app.models.patient import Patient
 from app.models.user import User, Role, Membership
 
 from app.services.shared.services import SharedService
+from app.services.encounter import EncounterService
 
 from app.schemas.appointment import (
     AppointmentListResponse, 
@@ -949,10 +950,8 @@ class AppointmentWorkflowService:
         appointment_id: UUID,
     ) -> AppointmentListItem:
         """
-        -CHECKED_IN → IN_PROGRESS
-        -queue.started_at
-        -queue.status = IN_PROGRESS
-        -convert planned to actual_procedures(optional)
+        CHECKED_IN → IN_PROGRESS
+        Creates ClinicalEncounter inside the same transaction.
         """
         appointment = await (
             AppointmentWorkflowService
@@ -970,24 +969,29 @@ class AppointmentWorkflowService:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Only checked-in appointments "
-                    "can be started"
+                    "Only checked-in appointments can be started"
                 ),
             )
 
-        appointment.status = (
-            AppointmentStatusEnum.IN_PROGRESS
-        )
+        appointment.status = AppointmentStatusEnum.IN_PROGRESS
         appointment.updated_by_id = user_id
 
         if appointment.queue_entry:
-            appointment.queue_entry.status = (
-                QueueStatusEnum.IN_PROGRESS
-            )
-
-            appointment.queue_entry.started_at = (
-                datetime.now(UTC)
-            )
+            appointment.queue_entry.status = QueueStatusEnum.IN_PROGRESS
+            appointment.queue_entry.started_at = datetime.now(UTC)
+            
+        await db.flush()
+        
+        encounter = await EncounterService.create_encounter(
+            db=db,
+            tenant_id=tenant_id,
+            patient_id=appointment.patient_id,
+            appointment_id=appointment_id,
+            doctor_id=appointment.assigned_doctor_id,
+            created_by_id=user_id,
+            chief_complaint=appointment.chief_complaint
+            # payload=encounter_payload or EncounterCreate(),
+        )
 
         try:
             await db.commit()
@@ -1012,6 +1016,11 @@ class AppointmentWorkflowService:
         user_id: UUID,
         appointment_id: UUID,
     ) -> AppointmentListItem:
+        """
+        IN_PROGRESS → COMPLETED
+        Guards: encounter must exist AND have a primary diagnosis.
+        Closes the encounter inside the same transaction.
+        """
 
         appointment = await (
             AppointmentWorkflowService
@@ -1032,10 +1041,26 @@ class AppointmentWorkflowService:
                     "Appointment must be in progress"
                 ),
             )
-
-        appointment.status = (
-            AppointmentStatusEnum.COMPLETED
+            
+        # ── GUARD: requires encounter and primary diagnosis
+        await EncounterService.validate_encounter_for_completion(
+            db=db,
+            tenant_id=tenant_id,
+            appointment_id=appointment_id,
         )
+        
+        from app.models.encounter import ClinicalEncounter
+        result = await db.execute(
+            select(ClinicalEncounter).where(
+                and_(
+                    ClinicalEncounter.appointment_id == appointment_id,
+                    ClinicalEncounter.tenant_id == tenant_id,
+                )
+            )
+        )
+        encounter = result.scalar_one_or_none()
+
+        appointment.status = AppointmentStatusEnum.COMPLETED
         appointment.updated_by_id = user_id
 
         # UPDATE PATIENT STATS
@@ -1053,6 +1078,10 @@ class AppointmentWorkflowService:
             appointment.queue_entry.completed_at = (
                 datetime.now(UTC)
             )
+            
+        # Close encounter: does not commit, caller commits
+        if encounter:
+            await EncounterService.close_encounter(db=db, encounter=encounter)
 
         try:
             await db.commit()

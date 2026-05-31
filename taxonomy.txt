@@ -273,3 +273,78 @@ export const DENTAL_TREATMENT_TAXONOMY: Record<string, string[]> = {
     "Pediatric Dental Treatment Plans": ["Preventive resin restoration", "Pit and fissure sealants", "Stainless steel crown", "Space maintainer", "Fluoride application", "Pulp therapy for primary teeth"],
     "Oral Medicine Treatment Plans": ["Topical medications", "Antifungal therapy", "Steroid therapy", "Habit cessation counseling", "Surgical excision of lesion"]
 };
+
+
+# class Diagnosis(Base):
+#     __tablename__ = "diagnoses"
+
+#     tenant_id
+#     patient_id
+#     appointment_id
+
+#     diagnosis_code
+#     diagnosis_name
+
+#     category
+#     severity
+
+#     tooth_numbers
+
+#     notes
+
+#     diagnosed_by_id
+#     diagnosed_at
+
+#     status
+
+# TreatmentPlan.diagnosis_id
+# class TreatmentPlan(Base, BaseMixin):
+    # __tablename__ = "treatment_plans"
+
+    # tenant_id
+    # patient_id
+
+    # diagnosis_id
+
+    # title
+    # description
+
+    # status
+    # priority
+
+    # estimated_total_cost
+    # estimated_total_duration_days
+
+    # start_date
+    # target_completion_date
+
+    # created_by_id
+    # approved_by_id
+
+    # notes
+    
+# class TreatmentSession(Base, BaseMixin):
+#     __tablename__ = "treatment_sessions"
+
+#     tenant_id
+#     treatment_plan_id
+
+#     appointment_id
+
+#     session_number
+
+#     title
+
+#     planned_date
+#     completed_date
+
+#     status
+
+#     notes
+
+
+
+
+# procedure.treatment_plan_id
+# procedure.treatment_session_id
+# procedure.diagnosis_id

@@ -129,3 +129,31 @@ class ProcedureCategoryEnum(str, Enum):
     PERIODONTIC = "PERIODONTIC"
     PROSTHODONTIC = "PROSTHODONTIC"
     OTHER = "OTHER"
+    
+    
+
+class EncounterStatusEnum(str, Enum):
+    IN_PROGRESS = "IN_PROGRESS"
+    CLOSED = "CLOSED"
+    VOID = "VOID"  # cancelled mid-session
+
+class TreatmentPlanStatusEnum(str, Enum):
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"  # all items done
+    PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class TreatmentPlanItemStatusEnum(str, Enum):
+    PENDING = "PENDING"      # scheduled for a future visit
+    DONE = "DONE"            # performed → Procedure created
+    DEFERRED = "DEFERRED"    # postponed, still on the plan
+    CANCELLED = "CANCELLED"  # removed from plan
+    CHANGED = "CHANGED"      # doctor changed approach, replaced by different procedure
+
+
+class InvestigationStatusEnum(str, Enum):
+    REQUESTED = "REQUESTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
