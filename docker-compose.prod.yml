@@ -11,9 +11,6 @@ services:
     env_file:
       - .env.prod
 
-    ports:
-      - "8000:8000"
-
     command: >
       gunicorn
       -k uvicorn.workers.UvicornWorker
