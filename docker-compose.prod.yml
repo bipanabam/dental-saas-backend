@@ -9,9 +9,17 @@ services:
     restart: unless-stopped
 
     env_file:
-      - .env.prod
-    ports:
-      - "8081:8000"
+      - .env
+    networks:
+      - coolify
+    # 3. Inject the Traefik routing labels manually
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.buddha-dental.rule=Host(`api.dentalsaas.tecobit.cloud`)"
+      - "traefik.http.routers.buddha-dental.entrypoints=https"
+      - "traefik.http.routers.buddha-dental.tls.certresolver=letsencrypt"
+      # Tell Traefik which internal port the container is listening on (8000)
+      - "traefik.http.services.buddha-dental.loadbalancer.server.port=8000"
     command: >
       gunicorn
       -k uvicorn.workers.UvicornWorker
@@ -26,3 +34,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+  # Explicitly declare the external root network
+networks:
+  coolify:
+    external: true
