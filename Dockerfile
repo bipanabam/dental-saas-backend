@@ -37,10 +37,12 @@ COPY . /code
 COPY ./boot/docker-run.sh /opt/run.sh
 RUN chmod +x /opt/run.sh
 
+EXPOSE 8000
+
 # Clean up apt cache to reduce image size
 RUN apt-get remove --purge -y \
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+&& apt-get autoremove -y \
+&& apt-get clean \
+&& rm -rf /var/lib/apt/lists/*
 
-CMD ["/opt/run.sh"]
+ENTRYPOINT ["/opt/run.sh"]
