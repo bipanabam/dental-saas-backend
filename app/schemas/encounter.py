@@ -5,6 +5,15 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+ 
+from app.taxonomy.validators import (
+    MedicalHistoryValidatorMixin,
+    ExaminationValidatorMixin,
+    FindingsValidatorMixin,
+    DiagnosisValidatorMixin,
+    InvestigationsValidatorMixin,
+)
+
 
 # ENCOUNTER
 class EncounterCreate(BaseModel):
@@ -66,18 +75,20 @@ class EncounterDetail(EncounterOut):
 
 # MEDICAL HISTORY
 class MedicalHistoryItemPayload(BaseModel):
-    item_id: str       # maps to MEDICAL_HISTORY_TAXONOMY
+    item_id: str      # validated against MEDICAL_HISTORY_TAXONOMY
     is_present: bool
     notes: str | None = None
 
 
-class MedicalHistoryCreate(BaseModel):
+class MedicalHistoryCreate(MedicalHistoryValidatorMixin, BaseModel):
     """
-    POST /encounters/{id}/history
+    MedicalHistoryValidatorMixin.validate_items() runs automatically.
+    Any unknown item_id raises 422 with a clear message before the
+    service layer is ever called.
     """
     items: list[MedicalHistoryItemPayload]
 
-    # Dental quick-flags — extracted and stored as dedicated columns
+    # Dental quick-flags extracted and stored as dedicated columns
     # so receptionists can query "all diabetic patients" fast.
     is_diabetic: bool | None = None
     has_hypertension: bool | None = None
@@ -108,18 +119,18 @@ class MedicalHistoryOut(BaseModel):
 
 # CLINICAL EXAMINATION
 class ExaminationEntryPayload(BaseModel):
-    category: str    # e.g. "Intraoral Soft Tissue Examination"
-    field_id: str    # e.g. "int_hygiene"
-    value: str       # e.g. "Poor", "true", "4-6mm"
+    category: str   # validated against ON_EXAMINATION_TAXONOMY categories
+    field_id: str   # validated against field ids
+    value: str      # validated against field type (checkbox/select/text rules)
 
 
-class ExaminationCreate(BaseModel):
+class ExaminationCreate(ExaminationValidatorMixin, BaseModel):
     """
-    POST /encounters/{id}/examination
-    Send as a batch — all entries upserted together.
-    Frontend sends the full filled-in form.
+    ExaminationValidatorMixin checks field_id existence and
+    value correctness (e.g. select values must be in the options list).
     """
     entries: list[ExaminationEntryPayload]
+ 
 
 
 class ExaminationEntryOut(BaseModel):
@@ -134,12 +145,11 @@ class ExaminationEntryOut(BaseModel):
 # CLINICAL FINDINGS
 class ClinicalFindingCreate(BaseModel):
     finding_code: str        # from DENTAL_PROBLEM_TAXONOMY
-    finding_name: str        # stored for historical stability
+    finding_name: str        # validated against DENTAL_PROBLEM_TAXONOMY
     tooth_numbers: list[int] | None = None
     notes: str | None = None
-
-
-class ClinicalFindingsBulkCreate(BaseModel):
+  
+class ClinicalFindingsBulkCreate(FindingsValidatorMixin, BaseModel):
     """POST /encounters/{id}/findings — send all at once."""
     findings: list[ClinicalFindingCreate]
 
@@ -156,30 +166,21 @@ class ClinicalFindingOut(BaseModel):
 
 # DIAGNOSIS
 class DiagnosisCreate(BaseModel):
-    diagnosis_code: str      # from DENTAL_DIAGNOSIS_TAXONOMY
-    diagnosis_name: str
+    diagnosis_code: str   # same as diagnosis_name
+    diagnosis_name: str   # validated against DENTAL_DIAGNOSIS_TAXONOMY
     icd10_code: str | None = None
     is_primary: bool = False
     tooth_numbers: list[int] | None = None
     notes: str | None = None
-
-
-class DiagnosisBulkCreate(BaseModel):
+    
+class DiagnosisBulkCreate(DiagnosisValidatorMixin, BaseModel):
     """
-    POST /encounters/{id}/diagnoses
-    Exactly one item must have is_primary=True.
-    Validated at the schema level.
+    DiagnosisValidatorMixin validates:
+      1. Every diagnosis_name is in DENTAL_DIAGNOSIS_TAXONOMY
+      2. Exactly one is_primary=True
+    Both checked in one pass, all errors collected before raising.
     """
     diagnoses: list[DiagnosisCreate]
-
-    @model_validator(mode="after")
-    def validate_primary(self) -> "DiagnosisBulkCreate":
-        primary_count = sum(1 for d in self.diagnoses if d.is_primary)
-        if primary_count != 1:
-            raise ValueError(
-                "Exactly one diagnosis must be marked as primary."
-            )
-        return self
 
 
 class DiagnosisUpdate(BaseModel):
@@ -205,13 +206,12 @@ class DiagnosisOut(BaseModel):
 
 # INVESTIGATION
 class InvestigationCreate(BaseModel):
-    investigation_code: str  # from DENTAL_INVESTIGATION_TAXONOMY
-    investigation_name: str
+    investigation_code: str  # same as investigation_name
+    investigation_name: str  # validated against DENTAL_INVESTIGATION_TAXONOMY
     notes: str | None = None
 
-
-class InvestigationsBulkCreate(BaseModel):
-    """POST /encounters/{id}/investigations"""
+ 
+class InvestigationsBulkCreate(InvestigationsValidatorMixin, BaseModel):
     investigations: list[InvestigationCreate]
 
 
