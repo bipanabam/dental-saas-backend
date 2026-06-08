@@ -51,6 +51,11 @@ class TaxonomyRegistry:
             for fields in ON_EXAMINATION_TAXONOMY.values()
             for f in fields
         }
+        self._field_to_category: dict[str, str] = {
+            field.id: category
+            for category, fields in ON_EXAMINATION_TAXONOMY.items()
+            for field in fields
+        }
 
         # clinical
         self._finding_names: frozenset[str] = frozenset(
@@ -132,6 +137,9 @@ class TaxonomyRegistry:
 
     def get_exam_field(self, field_id: str) -> ExamField | None:
         return self._exam_fields.get(field_id)
+    
+    def get_field_category(self, field_id: str) -> str | None:
+        return self._field_to_category.get(field_id)
 
     def get_medical_item(self, item_id: str) -> MedicalHistoryItem | None:
         return self._all_medical_items.get(item_id)

@@ -1,5 +1,5 @@
 """
-Encounter router — all clinical work between start and complete appointment.
+Encounter router: all clinical work between start and complete appointment.
 """
 from uuid import UUID
 from typing import Annotated
@@ -30,6 +30,9 @@ from app.schemas.encounter import (
     TreatmentPlanItemPerformCreate,
 )
 from app.services.encounter import EncounterService
+from app.services.medical_history import MedicalHistoryService
+from app.services.clinical_examination import ExaminationService
+
 
 router = APIRouter(prefix="/encounters", tags=["Clinical Encounter (Working)"])
 
@@ -63,10 +66,10 @@ async def get_encounter(
     db: Annotated[AsyncSession, Depends(get_db)],
     encounter_id: UUID,
 ):
-    return await EncounterService.get_encounter_by_appointment(
+    return await EncounterService.get_encounter_by_id(
         db=db,
         tenant_id=auth.membership.tenant_id,
-        appointment_id=encounter_id,
+        encounter_id=encounter_id,
     )
 
 
@@ -85,12 +88,13 @@ async def update_encounter(
     return await EncounterService.update_encounter(
         db=db,
         tenant_id=auth.membership.tenant_id,
+        user_id=auth.membership.user_id,
         encounter_id=encounter_id,
         payload=payload,
     )
 
 
-# MEDICAL HISTORY
+## MEDICAL HISTORY ##
 @router.post(
     "/{encounter_id}/history",
     response_model=MedicalHistoryOut,
@@ -105,10 +109,10 @@ async def upsert_medical_history(
 ):
     """
     Create or fully replace the medical history for this encounter.
-    Sending again overwrites the previous snapshot.
+    Sending again overwrites the previous medical-history snapshot.
     item_id values come from MEDICAL_HISTORY_TAXONOMY (frontend static file).
     """
-    return await EncounterService.upsert_medical_history(
+    return await MedicalHistoryService.upsert_medical_history(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -126,14 +130,14 @@ async def get_medical_history(
     db: Annotated[AsyncSession, Depends(get_db)],
     encounter_id: UUID,
 ):
-    return await EncounterService.get_medical_history(
+    return await MedicalHistoryService.get_medical_history_by_encounter_id(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
     )
 
 
-# CLINICAL EXAMINATION
+## CLINICAL EXAMINATION ##
 @router.post(
     "/{encounter_id}/examination",
     response_model=list[ExaminationEntryOut],
@@ -151,7 +155,7 @@ async def upsert_examination(
     field_id values come from ON_EXAMINATION_TAXONOMY (frontend static file).
     Sending again updates only the fields included — partial updates are fine.
     """
-    return await EncounterService.upsert_examination(
+    return await ExaminationService.upsert_examination(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -169,14 +173,14 @@ async def get_examination(
     db: Annotated[AsyncSession, Depends(get_db)],
     encounter_id: UUID,
 ):
-    return await EncounterService.get_examination(
+    return await ExaminationService.get_examination_by_encounter_id(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
     )
 
 
-# CLINICAL FINDINGS
+## CLINICAL FINDINGS ##
 @router.post(
     "/{encounter_id}/findings",
     response_model=list[ClinicalFindingOut],

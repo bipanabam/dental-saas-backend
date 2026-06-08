@@ -73,7 +73,8 @@ class EncounterDetail(EncounterOut):
     procedures: list[ProcedureSummary] = []
 
 
-# MEDICAL HISTORY
+
+## MEDICAL HISTORY ##
 class MedicalHistoryItemPayload(BaseModel):
     item_id: str      # validated against MEDICAL_HISTORY_TAXONOMY
     is_present: bool
@@ -90,14 +91,14 @@ class MedicalHistoryCreate(MedicalHistoryValidatorMixin, BaseModel):
 
     # Dental quick-flags extracted and stored as dedicated columns
     # so receptionists can query "all diabetic patients" fast.
-    is_diabetic: bool | None = None
-    has_hypertension: bool | None = None
-    has_heart_condition: bool | None = None
-    has_medication_allergy: bool | None = None
-    is_on_blood_thinners: bool | None = None
-    has_hepatitis_tb: bool | None = None
-    is_pregnant: bool | None = None
-    smokes_or_drinks: bool | None = None
+    # is_diabetic: bool | None = None
+    # has_hypertension: bool | None = None
+    # has_heart_condition: bool | None = None
+    # has_medication_allergy: bool | None = None
+    # is_on_blood_thinners: bool | None = None
+    # has_hepatitis_tb: bool | None = None
+    # is_pregnant: bool | None = None
+    # smokes_or_drinks: bool | None = None
 
 
 class MedicalHistoryOut(BaseModel):
@@ -117,13 +118,12 @@ class MedicalHistoryOut(BaseModel):
     updated_at: datetime
 
 
-# CLINICAL EXAMINATION
+## CLINICAL EXAMINATION ##
 class ExaminationEntryPayload(BaseModel):
     category: str   # validated against ON_EXAMINATION_TAXONOMY categories
     field_id: str   # validated against field ids
     value: str      # validated against field type (checkbox/select/text rules)
-
-
+    
 class ExaminationCreate(ExaminationValidatorMixin, BaseModel):
     """
     ExaminationValidatorMixin checks field_id existence and
@@ -131,8 +131,6 @@ class ExaminationCreate(ExaminationValidatorMixin, BaseModel):
     """
     entries: list[ExaminationEntryPayload]
  
-
-
 class ExaminationEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -142,7 +140,8 @@ class ExaminationEntryOut(BaseModel):
     value: str
 
 
-# CLINICAL FINDINGS
+
+## CLINICAL FINDINGS ##
 class ClinicalFindingCreate(BaseModel):
     finding_code: str        # from DENTAL_PROBLEM_TAXONOMY
     finding_name: str        # validated against DENTAL_PROBLEM_TAXONOMY
@@ -152,7 +151,6 @@ class ClinicalFindingCreate(BaseModel):
 class ClinicalFindingsBulkCreate(FindingsValidatorMixin, BaseModel):
     """POST /encounters/{id}/findings — send all at once."""
     findings: list[ClinicalFindingCreate]
-
 
 class ClinicalFindingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -164,7 +162,8 @@ class ClinicalFindingOut(BaseModel):
     notes: str | None
 
 
-# DIAGNOSIS
+
+## DIAGNOSIS ##
 class DiagnosisCreate(BaseModel):
     diagnosis_code: str   # same as diagnosis_name
     diagnosis_name: str   # validated against DENTAL_DIAGNOSIS_TAXONOMY

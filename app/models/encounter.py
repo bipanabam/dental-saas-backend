@@ -83,6 +83,10 @@ class ClinicalEncounter(Base, BaseMixin):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     # relationships
     appointment = relationship("Appointment", back_populates="encounter")
