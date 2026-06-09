@@ -18,43 +18,28 @@ from sqlalchemy.orm import selectinload
 
 from app.models.encounter import (
     ClinicalEncounter,
-    EncounterMedicalHistory,
-    ClinicalExaminationEntry,
-    ClinicalFinding,
-    EncounterDiagnosis,
-    Investigation,
     TreatmentPlan,
-    TreatmentPlanItem,
 )
-from app.models.procedure import Procedure
+
 from app.schemas.encounter import (
     EncounterCreate,
     EncounterUpdate,
-    EncounterOut,
-    MedicalHistoryCreate,
-    ExaminationCreate,
-    ClinicalFindingsBulkCreate,
-    DiagnosisBulkCreate,
-    InvestigationsBulkCreate,
-    InvestigationResultUpdate,
-    TreatmentPlanCreate,
-    TreatmentPlanItemPerformCreate,
     EncounterDetail,
+    EncounterOut,
     MedicalHistoryOut,
-    TreatmentPlanOut,
+    ExaminationEntryOut,
     InvestigationOut,
+    TreatmentPlanOut,
+    ProcedureSummary
 )
 from app.utils.enums import (
     EncounterStatusEnum,
-    TreatmentPlanItemStatusEnum,
-    ProcedureStatusEnum,
-    InvestigationStatusEnum,
 )
 
 
 class EncounterRepository:
     @staticmethod
-    async def _get_or_404(
+    async def get_or_404(
         db: AsyncSession,
         tenant_id: uuid.UUID,
         encounter_id: uuid.UUID,
@@ -109,9 +94,60 @@ class EncounterRepository:
                 status_code=404,
                 detail="Clinical encounter not found",
             )
+            
+class EncounterMapper:
+    
+    @staticmethod
+    def to_detail(
+        encounter: ClinicalEncounter,
+    ) -> EncounterDetail:
+        from app.services.clinical_findings import FindingMapper
+        from app.services.diagnosis import DiagnosisMapper
+        from app.services.investigation import InvestigationMapper
+
+        return EncounterDetail(
+            **EncounterOut.model_validate(encounter).model_dump(),
+            
+            medical_history=(
+                MedicalHistoryOut.model_validate(encounter.medical_history)
+                if encounter.medical_history
+                else None
+            ),
+
+            examination_findings=[
+                ExaminationEntryOut.model_validate(exam)
+                for exam in encounter.examination_findings
+            ],
+
+            clinical_findings=[
+                FindingMapper.to_finding_out(f)
+                for f in encounter.clinical_findings
+            ],
+
+            diagnoses=[
+                DiagnosisMapper.to_diagnosis_out(d)
+                for d in encounter.diagnoses
+            ],
+
+            investigations=[
+                InvestigationMapper.to_investigation_out(inv)
+                for inv in encounter.investigations
+            ],
+
+            treatment_plan=(
+                TreatmentPlanOut.model_validate(encounter.treatment_plan)
+                if encounter.treatment_plan
+                else None
+            ),
+
+            procedures=[
+                ProcedureSummary.model_validate(proc)
+                for proc in encounter.procedures
+            ],
+        )
         
 class EncounterService:
-    
+
     @staticmethod
     async def _get_encounter_by_appointment_or_404(
         db: AsyncSession,
@@ -160,7 +196,7 @@ class EncounterService:
         encounter = result.scalar_one_or_none()
         if not encounter:
             raise HTTPException(404, "No clinical encounter for this appointment")
-        return EncounterDetail.model_validate(encounter)
+        return EncounterMapper.to_detail(encounter)
     
     @staticmethod
     async def get_encounter_by_id(
@@ -191,7 +227,7 @@ class EncounterService:
         encounter = result.scalar_one_or_none()
         if not encounter:
             raise HTTPException(404, "No clinical encounter for this appointment")
-        return EncounterDetail.model_validate(encounter)
+        return EncounterMapper.to_detail(encounter)
 
     # ENCOUNTER LIFECYCLE
     @staticmethod
@@ -249,7 +285,7 @@ class EncounterService:
         Updates the clinical encounter details.
         """
         # Idempotency: return existing if already created
-        encounter = await EncounterRepository._get_or_404(
+        encounter = await EncounterRepository.get_or_404(
             db=db,
             tenant_id=tenant_id,
             encounter_id=encounter_id
@@ -341,7 +377,7 @@ class EncounterFlowService:
         tenant_id: uuid.UUID,
         encounter_id: uuid.UUID,
     ):
-        encounter = EncounterRepository._get_or_404(
+        encounter = EncounterRepository.get_or_404(
             id=id,
             tenant_id=tenant_id,
             encounter_id=encounter_id

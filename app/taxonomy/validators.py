@@ -69,6 +69,23 @@ def validate_finding_names(findings: list) -> list:
         raise ValueError(errors)
     return findings
 
+def validate_finding_codes(
+    findings: list,
+) -> list:
+    errors = []
+
+    for finding in findings:
+        try:
+            TAXONOMY.validate_finding_code(
+                finding.finding_code
+            )
+        except ValueError as e:
+            errors.append(str(e))
+
+    if errors:
+        raise ValueError(errors)
+
+    return findings
 
 def validate_diagnosis_names(diagnoses: list) -> list:
     """
@@ -93,6 +110,36 @@ def validate_diagnosis_names(diagnoses: list) -> list:
     return diagnoses
 
 
+def validate_diagnosis_codes(
+    diagnoses: list,
+) -> list:
+    errors = []
+
+    for diagnosis in diagnoses:
+        try:
+            TAXONOMY.validate_diagnosis_code(
+                diagnosis.diagnosis_code
+            )
+        except ValueError as e:
+            errors.append(str(e))
+
+    primary_count = sum(
+        1
+        for diagnosis in diagnoses
+        if diagnosis.is_primary
+    )
+
+    if primary_count != 1:
+        errors.append(
+            f"Exactly one diagnosis must be marked "
+            f"is_primary=True. Got {primary_count}."
+        )
+
+    if errors:
+        raise ValueError(errors)
+
+    return diagnoses
+
 def validate_investigation_names(investigations: list) -> list:
     """
     Validates every investigation_name in InvestigationsBulkCreate.investigations.
@@ -107,6 +154,24 @@ def validate_investigation_names(investigations: list) -> list:
         raise ValueError(errors)
     return investigations
 
+
+def validate_investigation_codes(
+    investigations: list,
+) -> list:
+    errors = []
+
+    for inv in investigations:
+        try:
+            TAXONOMY.validate_investigation_code(
+                inv.investigation_code
+            )
+        except ValueError as e:
+            errors.append(str(e))
+
+    if errors:
+        raise ValueError(errors)
+
+    return investigations
 
 # Drop-in Pydantic mixin classes
 # Inherit from these in your schema classes to auto-attach validators
@@ -127,19 +192,19 @@ class ExaminationValidatorMixin:
 class FindingsValidatorMixin:
     @model_validator(mode="after")
     def _validate_findings(self):
-        validate_finding_names(self.findings)
+        validate_finding_codes(self.findings)
         return self
 
 
 class DiagnosisValidatorMixin:
     @model_validator(mode="after")
     def _validate_diagnoses(self):
-        validate_diagnosis_names(self.diagnoses)
+        validate_diagnosis_codes(self.diagnoses)
         return self
 
 
 class InvestigationsValidatorMixin:
     @model_validator(mode="after")
     def _validate_investigations(self):
-        validate_investigation_names(self.investigations)
+        validate_investigation_codes(self.investigations)
         return self

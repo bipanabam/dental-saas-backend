@@ -14,8 +14,10 @@ from app.taxonomy.validators import (
     InvestigationsValidatorMixin,
 )
 
+from app.utils.enums import InvestigationStatusEnum
 
-# ENCOUNTER
+
+## ENCOUNTER ##
 class EncounterCreate(BaseModel):
     """
     Auto-created inside start_appointment() service.
@@ -144,7 +146,6 @@ class ExaminationEntryOut(BaseModel):
 ## CLINICAL FINDINGS ##
 class ClinicalFindingCreate(BaseModel):
     finding_code: str        # from DENTAL_PROBLEM_TAXONOMY
-    finding_name: str        # validated against DENTAL_PROBLEM_TAXONOMY
     tooth_numbers: list[int] | None = None
     notes: str | None = None
   
@@ -153,11 +154,12 @@ class ClinicalFindingsBulkCreate(FindingsValidatorMixin, BaseModel):
     findings: list[ClinicalFindingCreate]
 
 class ClinicalFindingOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    
     finding_code: str
     finding_name: str
+    
     tooth_numbers: list[int] | None
     notes: str | None
 
@@ -165,11 +167,14 @@ class ClinicalFindingOut(BaseModel):
 
 ## DIAGNOSIS ##
 class DiagnosisCreate(BaseModel):
-    diagnosis_code: str   # same as diagnosis_name
-    diagnosis_name: str   # validated against DENTAL_DIAGNOSIS_TAXONOMY
+    diagnosis_code: str  # validated against DENTAL_DIAGNOSIS_TAXONOMY
+
     icd10_code: str | None = None
+
     is_primary: bool = False
+
     tooth_numbers: list[int] | None = None
+
     notes: str | None = None
     
 class DiagnosisBulkCreate(DiagnosisValidatorMixin, BaseModel):
@@ -184,7 +189,6 @@ class DiagnosisBulkCreate(DiagnosisValidatorMixin, BaseModel):
 
 class DiagnosisUpdate(BaseModel):
     diagnosis_code: str | None = None
-    diagnosis_name: str | None = None
     icd10_code: str | None = None
     is_primary: bool | None = None
     tooth_numbers: list[int] | None = None
@@ -192,21 +196,21 @@ class DiagnosisUpdate(BaseModel):
 
 
 class DiagnosisOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
+
     diagnosis_code: str
     diagnosis_name: str
     icd10_code: str | None
+
     is_primary: bool
+    
     tooth_numbers: list[int] | None
     notes: str | None
 
 
-# INVESTIGATION
+## INVESTIGATION ##
 class InvestigationCreate(BaseModel):
-    investigation_code: str  # same as investigation_name
-    investigation_name: str  # validated against DENTAL_INVESTIGATION_TAXONOMY
+    investigation_code: str  # validated against DENTAL_INVESTIGATION_TAXONOMY
     notes: str | None = None
 
  
@@ -218,24 +222,26 @@ class InvestigationResultUpdate(BaseModel):
     """PATCH /encounters/{encounter_id}/investigations/{id}/result"""
     result: str | None = None
     result_file_url: str | None = None
-    status: str  # COMPLETED or CANCELLED
+    status: InvestigationStatusEnum  # COMPLETED or CANCELLED
 
 
 class InvestigationOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    
     investigation_code: str
     investigation_name: str
+    
     status: str
     notes: str | None
     result: str | None
     result_file_url: str | None
+    
     requested_at: datetime
     completed_at: datetime | None
 
 
-# TREATMENT PLAN
+## TREATMENT PLAN ##
 class TreatmentPlanItemCreate(BaseModel):
     procedure_catalog_id: uuid.UUID
     tooth_numbers: list[int] | None = None

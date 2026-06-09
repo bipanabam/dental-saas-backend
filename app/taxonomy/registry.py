@@ -63,11 +63,21 @@ class TaxonomyRegistry:
             for names in DENTAL_PROBLEM_TAXONOMY.values()
             for name in names
         )
+        self._finding_codes = frozenset(
+            code
+            for codes in DENTAL_PROBLEM_TAXONOMY.values()
+            for code in codes
+        )
 
         self._diagnosis_names: frozenset[str] = frozenset(
             name
             for names in DENTAL_DIAGNOSIS_TAXONOMY.values()
             for name in names
+        )
+        self._diagnosis_codes = frozenset(
+            code
+            for codes in DENTAL_DIAGNOSIS_TAXONOMY.values()
+            for code in codes
         )
 
         self._investigation_names: frozenset[str] = frozenset(
@@ -75,6 +85,29 @@ class TaxonomyRegistry:
             for names in DENTAL_INVESTIGATION_TAXONOMY.values()
             for name in names
         )
+        self._investigation_codes = frozenset(
+            code
+            for codes in DENTAL_INVESTIGATION_TAXONOMY.values()
+            for code in codes
+        )
+        
+        self._finding_lookup = {
+            name: name
+            for names in DENTAL_PROBLEM_TAXONOMY.values()
+            for name in names
+        }
+
+        self._diagnosis_lookup = {
+            name: name
+            for names in DENTAL_DIAGNOSIS_TAXONOMY.values()
+            for name in names
+        }
+
+        self._investigation_lookup = {
+            name: name
+            for names in DENTAL_INVESTIGATION_TAXONOMY.values()
+            for name in names
+        }
 
     # validation helpers (raise ValueError on failure)
     def validate_medical_item_id(self, item_id: str) -> None:
@@ -116,6 +149,15 @@ class TaxonomyRegistry:
                 f"Unknown finding: '{finding_name}'. "
                 f"Must be a value from DENTAL_PROBLEM_TAXONOMY."
             )
+            
+    def validate_finding_code(
+        self,
+        finding_code: str,
+    ) -> None:
+        if finding_code not in self._finding_codes:
+            raise ValueError(
+                f"Unknown finding code: '{finding_code}'."
+            )
 
     def validate_diagnosis(self, diagnosis_name: str) -> None:
         if diagnosis_name not in self._diagnosis_names:
@@ -123,12 +165,30 @@ class TaxonomyRegistry:
                 f"Unknown diagnosis: '{diagnosis_name}'. "
                 f"Must be a value from DENTAL_DIAGNOSIS_TAXONOMY."
             )
+            
+    def validate_diagnosis_code(
+        self,
+        diagnosis_code: str,
+    ) -> None:
+        if diagnosis_code not in self._diagnosis_codes:
+            raise ValueError(
+                f"Unknown diagnosis code: '{diagnosis_code}'."
+            )
 
     def validate_investigation(self, investigation_name: str) -> None:
         if investigation_name not in self._investigation_names:
             raise ValueError(
                 f"Unknown investigation: '{investigation_name}'. "
                 f"Must be a value from DENTAL_INVESTIGATION_TAXONOMY."
+            )
+            
+    def validate_investigation_code(
+        self,
+        investigation_code: str,
+    ) -> None:
+        if investigation_code not in self._investigation_codes:
+            raise ValueError(
+                f"Unknown investigation code: '{investigation_code}'."
             )
 
     # boolean checks (no raise — use in conditions)
@@ -143,6 +203,15 @@ class TaxonomyRegistry:
 
     def get_medical_item(self, item_id: str) -> MedicalHistoryItem | None:
         return self._all_medical_items.get(item_id)
+    
+    def get_finding_name(self, code: str) -> str | None:
+        return self._finding_lookup.get(code)
+
+    def get_diagnosis_name(self, code: str) -> str | None:
+        return self._diagnosis_lookup.get(code)
+
+    def get_investigation_name(self, code: str) -> str | None:
+        return self._investigation_lookup.get(code)
 
     # API endpoint helpers
     def to_api_dict(self) -> dict:

@@ -230,7 +230,7 @@ class ClinicalFinding(Base, BaseMixin):
     finding_code: Mapped[str] = mapped_column(String(200), nullable=False)
 
     # Human-readable label stored for historical stability
-    finding_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # finding_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
     # [46, 47] — FDI tooth numbers
     tooth_numbers: Mapped[list[int] | None] = mapped_column(JSONB, nullable=True)
@@ -244,9 +244,7 @@ class ClinicalFinding(Base, BaseMixin):
 
 
 # ENCOUNTER DIAGNOSIS
-# Converted from findings. Separate from findings because
-# a finding (Pain while chewing) leads to a diagnosis
-# (Irreversible pulpitis). They are not the same thing.
+# Converted from findings. Separate from findings because a finding (Pain while chewing) leads to a diagnosis (Irreversible pulpitis). They are not the same thing.
 # diagnosis_code maps to DENTAL_DIAGNOSIS_TAXONOMY (static).
 class EncounterDiagnosis(Base, BaseMixin):
     __tablename__ = "encounter_diagnoses"
@@ -259,7 +257,7 @@ class EncounterDiagnosis(Base, BaseMixin):
 
     # e.g. "Irreversible pulpitis"
     diagnosis_code: Mapped[str] = mapped_column(String(200), nullable=False)
-    diagnosis_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # diagnosis_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
     # ICD-10 code for reporting (optional)
     icd10_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -304,7 +302,7 @@ class Investigation(Base, BaseMixin):
 
     # e.g. "Intraoral periapical radiograph (IOPA)"
     investigation_code: Mapped[str] = mapped_column(String(200), nullable=False)
-    investigation_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # investigation_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
     status: Mapped[InvestigationStatusEnum] = mapped_column(
         Enum(InvestigationStatusEnum, name="investigation_status_enum"),

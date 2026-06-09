@@ -141,6 +141,7 @@ class TreatmentPlanStatusEnum(str, Enum):
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"  # all items done
     PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"
+    DEFERRED = "DEFERRED"
     CANCELLED = "CANCELLED"
 
 

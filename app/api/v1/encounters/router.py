@@ -32,6 +32,10 @@ from app.schemas.encounter import (
 from app.services.encounter import EncounterService
 from app.services.medical_history import MedicalHistoryService
 from app.services.clinical_examination import ExaminationService
+from app.services.clinical_findings import FindingService
+from app.services.diagnosis import DiagnosisService
+from app.services.investigation import InvestigationService
+from app.services.treatmentplan import TreatmentPlanService
 
 
 router = APIRouter(prefix="/encounters", tags=["Clinical Encounter (Working)"])
@@ -198,13 +202,12 @@ async def create_findings(
     finding_code values come from DENTAL_PROBLEM_TAXONOMY.
     Can be called multiple times — each call appends new findings.
     """
-    return await EncounterService.create_findings(
+    return await FindingService.create_findings(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
         payload=payload,
     )
-
 
 @router.get(
     "/{encounter_id}/findings",
@@ -216,7 +219,7 @@ async def list_findings(
     db: Annotated[AsyncSession, Depends(get_db)],
     encounter_id: UUID,
 ):
-    return await EncounterService.get_findings(
+    return await FindingService.get_findings_by_encounter_id(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -234,7 +237,7 @@ async def delete_finding(
     encounter_id: UUID,
     finding_id: UUID,
 ):
-    await EncounterService.delete_finding(
+    await FindingService.delete_finding(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -242,7 +245,7 @@ async def delete_finding(
     )
 
 
-# DIAGNOSES
+## DIAGNOSES ##
 @router.post(
     "/{encounter_id}/diagnoses",
     response_model=list[DiagnosisOut],
@@ -262,7 +265,7 @@ async def create_diagnoses(
 
     Only DOCTOR role can set diagnoses.
     """
-    return await EncounterService.create_diagnoses(
+    return await DiagnosisService.replace_diagnoses(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -280,14 +283,14 @@ async def list_diagnoses(
     db: Annotated[AsyncSession, Depends(get_db)],
     encounter_id: UUID,
 ):
-    return await EncounterService.get_diagnoses(
+    return await DiagnosisService.get_diagnoses(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
     )
 
 
-# INVESTIGATIONS
+## INVESTIGATIONS ##
 @router.post(
     "/{encounter_id}/investigations",
     response_model=list[InvestigationOut],
@@ -304,13 +307,9 @@ async def create_investigations(
     Order one or more investigations for this visit.
     investigation_code values come from DENTAL_INVESTIGATION_TAXONOMY.
     """
-    encounter = await EncounterService._get_encounter_or_404(
-        db, auth.membership.tenant_id, encounter_id
-    )
-    return await EncounterService.create_investigations(
+    return await InvestigationService.create_investigations(
         db=db,
         tenant_id=auth.membership.tenant_id,
-        patient_id=encounter.patient_id,
         encounter_id=encounter_id,
         payload=payload,
     )
@@ -326,7 +325,7 @@ async def list_investigations(
     db: Annotated[AsyncSession, Depends(get_db)],
     encounter_id: UUID,
 ):
-    return await EncounterService.get_investigations(
+    return await InvestigationService.get_investigations(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -349,7 +348,7 @@ async def update_investigation_result(
     Fill in the result after an X-ray or lab result is available.
     Status must be COMPLETED or CANCELLED.
     """
-    return await EncounterService.update_investigation_result(
+    return await InvestigationService.update_investigation_result(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -358,7 +357,7 @@ async def update_investigation_result(
     )
 
 
-# TREATMENT PLAN
+## TREATMENT PLAN ##
 @router.post(
     "/{encounter_id}/treatment-plan",
     response_model=TreatmentPlanOut,

@@ -73,7 +73,7 @@ class MedicalHistoryService:
         payload: MedicalHistoryCreate,
     ) -> MedicalHistoryOut:
 
-        encounter = await EncounterRepository._get_or_404(
+        encounter = await EncounterRepository.get_or_404(
             db=db,
             tenant_id=tenant_id,
             encounter_id=encounter_id,
@@ -130,7 +130,7 @@ class MedicalHistoryService:
         encounter_id: UUID,
     ) -> MedicalHistoryOut:
 
-        encounter = await EncounterRepository._get_or_404(
+        encounter = await EncounterRepository.get_or_404(
             db=db,
             tenant_id=tenant_id,
             encounter_id=encounter_id,
