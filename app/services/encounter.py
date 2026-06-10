@@ -20,6 +20,7 @@ from app.models.encounter import (
     ClinicalEncounter,
     TreatmentPlan,
 )
+from app.models.procedure import Procedure
 
 from app.schemas.encounter import (
     EncounterCreate,
@@ -28,12 +29,13 @@ from app.schemas.encounter import (
     EncounterOut,
     MedicalHistoryOut,
     ExaminationEntryOut,
-    InvestigationOut,
     TreatmentPlanOut,
     ProcedureSummary
 )
 from app.utils.enums import (
     EncounterStatusEnum,
+    TreatmentPlanItemStatusEnum,
+    InvestigationStatusEnum
 )
 
 
@@ -56,7 +58,11 @@ class EncounterRepository:
                 selectinload(ClinicalEncounter.treatment_plan).selectinload(
                     TreatmentPlan.items
                 ),
-                selectinload(ClinicalEncounter.procedures),
+                
+                selectinload(ClinicalEncounter.procedures)
+                .selectinload(
+                    Procedure.procedure_catalog
+                ),
             ]
 
         result = await db.execute(
@@ -72,6 +78,26 @@ class EncounterRepository:
         encounter = result.scalar_one_or_none()
         if not encounter:
             raise HTTPException(404, "Clinical encounter not found")
+        return encounter
+    
+    @staticmethod
+    async def get_by_appointment_id(
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        appointment_id: uuid.UUID,
+    ) -> ClinicalEncounter:
+        result = await db.execute(
+            select(ClinicalEncounter)
+            .where(
+                and_(
+                    ClinicalEncounter.appointment_id == appointment_id,
+                    ClinicalEncounter.tenant_id == tenant_id,
+                )
+            )
+        )
+        encounter = result.scalar_one_or_none()
+        if not encounter:
+            raise HTTPException(404, "No clinical encounter for this appointment")
         return encounter
     
     @staticmethod
@@ -95,6 +121,36 @@ class EncounterRepository:
                 detail="Clinical encounter not found",
             )
             
+    @staticmethod
+    async def get_for_closure(
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        encounter_id: uuid.UUID,
+    ) -> ClinicalEncounter:
+
+        result = await db.execute(
+            select(ClinicalEncounter)
+            .where(
+                ClinicalEncounter.id == encounter_id,
+                ClinicalEncounter.tenant_id == tenant_id,
+            )
+            .options(
+                selectinload(ClinicalEncounter.diagnoses),
+                selectinload(ClinicalEncounter.treatment_plan)
+                .selectinload(TreatmentPlan.items),
+            )
+        )
+
+        encounter = result.scalar_one_or_none()
+
+        if not encounter:
+            raise HTTPException(
+                404,
+                "Encounter not found",
+            )
+
+        return encounter
+                
 class EncounterMapper:
     
     @staticmethod
@@ -104,6 +160,8 @@ class EncounterMapper:
         from app.services.clinical_findings import FindingMapper
         from app.services.diagnosis import DiagnosisMapper
         from app.services.investigation import InvestigationMapper
+        from app.services.treatmentplan import TreatmentPlanMapper
+        from app.services.procedure import ProcedureMapper
 
         return EncounterDetail(
             **EncounterOut.model_validate(encounter).model_dump(),
@@ -141,7 +199,7 @@ class EncounterMapper:
             ),
 
             procedures=[
-                ProcedureSummary.model_validate(proc)
+                ProcedureMapper.to_procedure_summary(proc)
                 for proc in encounter.procedures
             ],
         )
@@ -204,27 +262,12 @@ class EncounterService:
         tenant_id: uuid.UUID,
         encounter_id: uuid.UUID,
     ) -> EncounterDetail:
-        result = await db.execute(
-            select(ClinicalEncounter)
-            .where(
-                and_(
-                    ClinicalEncounter.id == encounter_id,
-                    ClinicalEncounter.tenant_id == tenant_id,
-                )
-            )
-            .options(
-                selectinload(ClinicalEncounter.medical_history),
-                selectinload(ClinicalEncounter.examination_findings),
-                selectinload(ClinicalEncounter.clinical_findings),
-                selectinload(ClinicalEncounter.diagnoses),
-                selectinload(ClinicalEncounter.investigations),
-                selectinload(ClinicalEncounter.treatment_plan).selectinload(
-                    TreatmentPlan.items
-                ),
-                selectinload(ClinicalEncounter.procedures),
-            )
+        encounter = await EncounterRepository.get_or_404(
+            db=db,
+            tenant_id=tenant_id,
+            encounter_id=encounter_id,
+            load_full=True
         )
-        encounter = result.scalar_one_or_none()
         if not encounter:
             raise HTTPException(404, "No clinical encounter for this appointment")
         return EncounterMapper.to_detail(encounter)
@@ -317,82 +360,91 @@ class EncounterService:
                 detail="Failed to update clinical encounter",
             )
         return encounter
+    
+class EncounterClosureValidator:
+
+    @staticmethod
+    def validate(
+        encounter: ClinicalEncounter,
+    ) -> None:
+
+        if encounter.status != EncounterStatusEnum.IN_PROGRESS:
+            raise HTTPException(
+                400,
+                "Encounter is not active",
+            )
+
+        if not encounter.diagnoses:
+            raise HTTPException(
+                400,
+                "At least one diagnosis is required",
+            )
+
+        primary_diagnoses = [
+            diagnosis
+            for diagnosis in encounter.diagnoses
+            if diagnosis.is_primary
+        ]
+
+        if len(primary_diagnoses) != 1:
+            raise HTTPException(
+                400,
+                "Exactly one primary diagnosis is required",
+            )
+
+        if encounter.treatment_plan:
+            invalid_items = [
+                item
+                for item in encounter.treatment_plan.items
+                if (
+                    item.status
+                    == TreatmentPlanItemStatusEnum.DONE
+                    and not item.performed_procedure_id
+                )
+            ]
+
+            if invalid_items:
+                raise HTTPException(
+                    400,
+                    "Completed treatment items must have procedures attached",
+                )
 
 class EncounterFlowService:
     @staticmethod
     async def start_encounter():
         pass
-
-    @staticmethod
-    async def validate_encounter_for_completion(
-        db: AsyncSession,
-        tenant_id: uuid.UUID,
-        appointment_id: uuid.UUID,
-    ) -> None:
-        """
-        Called by complete_appointment() BEFORE marking appointment COMPLETED.
-        Raises 400 if clinical requirements are not met.
-        """
-        result = await db.execute(
-            select(ClinicalEncounter)
-            .where(
-                and_(
-                    ClinicalEncounter.appointment_id == appointment_id,
-                    ClinicalEncounter.tenant_id == tenant_id,
-                )
-            )
-            .options(selectinload(ClinicalEncounter.diagnoses))
-        )
-        encounter = result.scalar_one_or_none()
-
-        if not encounter:
-            raise HTTPException(
-                400,
-                "Cannot complete appointment: no clinical encounter was started. "
-                "Call POST /appointments/{id}/start first.",
-            )
-
-        primary_diagnoses = [d for d in encounter.diagnoses if d.is_primary]
-        if not primary_diagnoses:
-            raise HTTPException(
-                400,
-                "Cannot complete appointment: a primary diagnosis is required. "
-                "Add at least one diagnosis via POST /encounters/{id}/diagnoses.",
-            )
-            
+    
     @staticmethod
     async def close_encounter(
         db: AsyncSession,
-        encounter: ClinicalEncounter,
-    ) -> None:
-        """
-        Called after appointment.status → COMPLETED.
-        Closes the encounter. Does NOT commit — caller commits.
-        """
-        encounter.status = EncounterStatusEnum.CLOSED
-        encounter.closed_at = datetime.now(UTC)
-
-    async def complete_encounter(
-        db: AsyncSession,
         tenant_id: uuid.UUID,
+        user_id: uuid.UUID,
         encounter_id: uuid.UUID,
-    ):
-        encounter = EncounterRepository.get_or_404(
-            id=id,
-            tenant_id=tenant_id,
-            encounter_id=encounter_id
+    ) -> ClinicalEncounter:
+
+        encounter = (
+            await EncounterRepository.get_for_closure(
+                db=db,
+                tenant_id=tenant_id,
+                encounter_id=encounter_id,
+            )
         )
-        await EncounterFlowService.validate_encounter_for_completion(
-            db=db,
-            tenant_id=tenant_id,
-            appointment_id=encounter.appointment_id
+        
+        if encounter.status == EncounterStatusEnum.CLOSED:
+            return encounter
+
+        EncounterClosureValidator.validate(
+            encounter
+        )
+        
+
+        encounter.status = (
+            EncounterStatusEnum.CLOSED
         )
 
-        encounter.status = EncounterStatusEnum.CLOSED
-
-        # appointment.status = COMPLETED
-
-        # queue.status = COMPLETED
+        encounter.closed_at = datetime.now(UTC)
+        encounter.closed_by_id = user_id
+        return encounter
 
     async def reopen_encounter():
         pass

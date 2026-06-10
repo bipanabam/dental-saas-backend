@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies.auth import CurrentAuth
-from app.models.user import User
+
 from app.schemas.encounter import (
     EncounterUpdate,
     EncounterOut,
@@ -27,18 +27,23 @@ from app.schemas.encounter import (
     InvestigationResultUpdate,
     TreatmentPlanCreate,
     TreatmentPlanOut,
+    TreatmentPlanItemOut,
     TreatmentPlanItemPerformCreate,
+    ProcedureSummary
 )
-from app.services.encounter import EncounterService
+from app.schemas.procedure import ProcedureOut, ProcedureCreate
+
+from app.services.encounter import EncounterService, EncounterRepository, EncounterFlowService
 from app.services.medical_history import MedicalHistoryService
 from app.services.clinical_examination import ExaminationService
 from app.services.clinical_findings import FindingService
 from app.services.diagnosis import DiagnosisService
 from app.services.investigation import InvestigationService
-from app.services.treatmentplan import TreatmentPlanService
+from app.services.treatmentplan import TreatmentPlanService, TreatmentPlanExecutionService
+from app.services.procedure import ProcedureService
 
 
-router = APIRouter(prefix="/encounters", tags=["Clinical Encounter (Working)"])
+router = APIRouter(prefix="/encounters", tags=["Clinical Encounter"])
 
 
 @router.get(
@@ -93,6 +98,69 @@ async def update_encounter(
         db=db,
         tenant_id=auth.membership.tenant_id,
         user_id=auth.membership.user_id,
+        encounter_id=encounter_id,
+        payload=payload,
+    )
+    
+    
+@router.post(
+    "/{encounter_id}/close",
+    response_model=EncounterOut,
+)
+async def close_encounter(
+    auth: CurrentAuth,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    encounter_id: UUID,
+):
+    """Close clinical encounter."""
+    encounter = await EncounterFlowService.close_encounter(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        user_id=auth.membership.user_id,
+        encounter_id=encounter_id,
+    )
+    
+    await db.commit()
+    await db.refresh(encounter)
+    return encounter
+    
+
+## PROCEDURES ##
+@router.get(
+    "/{encounter_id}/procedures",
+    response_model=list[ProcedureSummary],
+)
+async def list_procedures(
+    auth: CurrentAuth,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    encounter_id: UUID,
+):
+    return await ProcedureService.list_by_encounter(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        encounter_id=encounter_id,
+    )
+    
+
+@router.post(
+    "/{encounter_id}/procedures",
+    response_model=ProcedureOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create procedure directly",
+)
+async def create_procedure(
+    auth: CurrentAuth,
+    db: Annotated[
+        AsyncSession,
+        Depends(get_db),
+    ],
+    encounter_id: UUID,
+    payload: ProcedureCreate,
+):
+    return await ProcedureService.create(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        performed_by_id=auth.user.id,
         encounter_id=encounter_id,
         payload=payload,
     )
@@ -378,10 +446,12 @@ async def create_treatment_plan(
     409 if a plan already exists — update via PATCH instead.
     Only DOCTOR role can create treatment plans.
     """
-    encounter = await EncounterService._get_encounter_or_404(
-        db, auth.membership.tenant_id, encounter_id
+    encounter = await EncounterRepository.get_or_404(
+        db=db, 
+        tenant_id=auth.membership.tenant_id, 
+        encounter_id=encounter_id
     )
-    return await EncounterService.create_treatment_plan(
+    return await TreatmentPlanService.create_treatment_plan(
         db=db,
         tenant_id=auth.membership.tenant_id,
         patient_id=encounter.patient_id,
@@ -400,7 +470,7 @@ async def get_treatment_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
     encounter_id: UUID,
 ):
-    return await EncounterService.get_treatment_plan(
+    return await TreatmentPlanService.get(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -431,7 +501,7 @@ async def perform_treatment_plan_item(
     Returns the updated treatment plan with the item marked DONE.
     Only DOCTOR role can perform procedures.
     """
-    return await EncounterService.perform_treatment_plan_item(
+    return await TreatmentPlanExecutionService.perform_treatment_plan_item(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,
@@ -443,7 +513,7 @@ async def perform_treatment_plan_item(
 
 @router.patch(
     "/{encounter_id}/treatment-plan/items/{item_id}/defer",
-    response_model=TreatmentPlanOut,
+    response_model=TreatmentPlanItemOut,
     summary="Defer a plan item to a future visit",
 )
 async def defer_treatment_plan_item(
@@ -453,7 +523,27 @@ async def defer_treatment_plan_item(
     item_id: UUID,
 ):
     """Mark an item as DEFERRED — will not be done today."""
-    return await EncounterService.defer_treatment_plan_item(
+    return await TreatmentPlanExecutionService.defer_treatment_plan_item(
+        db=db,
+        tenant_id=auth.membership.tenant_id,
+        encounter_id=encounter_id,
+        item_id=item_id,
+    )
+    
+# POST ->  /encounters/{id}/treatment-plan/items/{id}/cancel
+@router.patch(
+    "/{encounter_id}/treatment-plan/items/{item_id}/cancel",
+    response_model=TreatmentPlanItemOut,
+    summary="Cancel a plan item",
+)
+async def cancel_treatment_plan_item(
+    auth: CurrentAuth,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    encounter_id: UUID,
+    item_id: UUID,
+):
+    """Cancel the treatment plan item"""
+    return await TreatmentPlanExecutionService.cancel_item(
         db=db,
         tenant_id=auth.membership.tenant_id,
         encounter_id=encounter_id,

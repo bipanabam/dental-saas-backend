@@ -1048,22 +1048,18 @@ class AppointmentWorkflowService:
             )
             
         # GUARD: requires encounter and primary diagnosis
-        await EncounterFlowService.validate_encounter_for_completion(
+        from app.services.encounter import EncounterRepository
+        encounter = await EncounterRepository.get_by_appointment_id(
             db=db,
             tenant_id=tenant_id,
             appointment_id=appointment_id,
         )
-        
-        from app.models.encounter import ClinicalEncounter
-        result = await db.execute(
-            select(ClinicalEncounter).where(
-                and_(
-                    ClinicalEncounter.appointment_id == appointment_id,
-                    ClinicalEncounter.tenant_id == tenant_id,
-                )
-            )
+        await EncounterFlowService.close_encounter(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            encounter_id=encounter.id,
         )
-        encounter = result.scalar_one_or_none()
 
         appointment.status = AppointmentStatusEnum.COMPLETED
         appointment.updated_by_id = user_id
@@ -1079,15 +1075,9 @@ class AppointmentWorkflowService:
             appointment.queue_entry.status = (
                 QueueStatusEnum.COMPLETED
             )
-
-            appointment.queue_entry.completed_at = (
-                datetime.now(UTC)
-            )
+            appointment.queue_entry.completed_at = datetime.now(UTC)
             
         # Close encounter: does not commit, caller commits
-        if encounter:
-            await EncounterFlowService.close_encounter(db=db, encounter=encounter)
-
         try:
             await db.commit()
         except SQLAlchemyError as e:
@@ -1100,7 +1090,6 @@ class AppointmentWorkflowService:
             )
 
         await db.refresh(appointment)
-
         return AppointmentListItem.model_validate(
             appointment
         )

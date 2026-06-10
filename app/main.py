@@ -15,6 +15,7 @@ from app.api.v1.appointments.router import router as appointment_router
 from app.api.v1.queue.router import router as queue_router
 from app.api.v1.taxonomy.router import router as taxonomy_router
 from app.api.v1.encounters.router import router as encounter_router
+from app.api.v1.procedures.router import router as procedure_router
 
 from app.api.super_admin.auth.router import router as super_admin_auth_router
 
@@ -55,6 +56,7 @@ app.include_router(patients_router, prefix=settings.API_PREFIX)
 app.include_router(appointment_router, prefix=settings.API_PREFIX)
 app.include_router(queue_router, prefix=settings.API_PREFIX)
 app.include_router(encounter_router, prefix=settings.API_PREFIX)
+app.include_router(procedure_router, prefix=settings.API_PREFIX)
 
 app.include_router(taxonomy_router, prefix=settings.API_PREFIX)
 app.include_router(super_admin_auth_router, prefix=settings.API_PREFIX)
