@@ -5,8 +5,19 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+ 
+from app.taxonomy.validators import (
+    MedicalHistoryValidatorMixin,
+    ExaminationValidatorMixin,
+    FindingsValidatorMixin,
+    DiagnosisValidatorMixin,
+    InvestigationsValidatorMixin,
+)
 
-# ENCOUNTER
+from app.utils.enums import InvestigationStatusEnum
+
+
+## ENCOUNTER ##
 class EncounterCreate(BaseModel):
     """
     Auto-created inside start_appointment() service.
@@ -64,29 +75,32 @@ class EncounterDetail(EncounterOut):
     procedures: list[ProcedureSummary] = []
 
 
-# MEDICAL HISTORY
+
+## MEDICAL HISTORY ##
 class MedicalHistoryItemPayload(BaseModel):
-    item_id: str       # maps to MEDICAL_HISTORY_TAXONOMY
+    item_id: str      # validated against MEDICAL_HISTORY_TAXONOMY
     is_present: bool
     notes: str | None = None
 
 
-class MedicalHistoryCreate(BaseModel):
+class MedicalHistoryCreate(MedicalHistoryValidatorMixin, BaseModel):
     """
-    POST /encounters/{id}/history
+    MedicalHistoryValidatorMixin.validate_items() runs automatically.
+    Any unknown item_id raises 422 with a clear message before the
+    service layer is ever called.
     """
     items: list[MedicalHistoryItemPayload]
 
-    # Dental quick-flags — extracted and stored as dedicated columns
+    # Dental quick-flags extracted and stored as dedicated columns
     # so receptionists can query "all diabetic patients" fast.
-    is_diabetic: bool | None = None
-    has_hypertension: bool | None = None
-    has_heart_condition: bool | None = None
-    has_medication_allergy: bool | None = None
-    is_on_blood_thinners: bool | None = None
-    has_hepatitis_tb: bool | None = None
-    is_pregnant: bool | None = None
-    smokes_or_drinks: bool | None = None
+    # is_diabetic: bool | None = None
+    # has_hypertension: bool | None = None
+    # has_heart_condition: bool | None = None
+    # has_medication_allergy: bool | None = None
+    # is_on_blood_thinners: bool | None = None
+    # has_hepatitis_tb: bool | None = None
+    # is_pregnant: bool | None = None
+    # smokes_or_drinks: bool | None = None
 
 
 class MedicalHistoryOut(BaseModel):
@@ -106,22 +120,19 @@ class MedicalHistoryOut(BaseModel):
     updated_at: datetime
 
 
-# CLINICAL EXAMINATION
+## CLINICAL EXAMINATION ##
 class ExaminationEntryPayload(BaseModel):
-    category: str    # e.g. "Intraoral Soft Tissue Examination"
-    field_id: str    # e.g. "int_hygiene"
-    value: str       # e.g. "Poor", "true", "4-6mm"
-
-
-class ExaminationCreate(BaseModel):
+    category: str   # validated against ON_EXAMINATION_TAXONOMY categories
+    field_id: str   # validated against field ids
+    value: str      # validated against field type (checkbox/select/text rules)
+    
+class ExaminationCreate(ExaminationValidatorMixin, BaseModel):
     """
-    POST /encounters/{id}/examination
-    Send as a batch — all entries upserted together.
-    Frontend sends the full filled-in form.
+    ExaminationValidatorMixin checks field_id existence and
+    value correctness (e.g. select values must be in the options list).
     """
     entries: list[ExaminationEntryPayload]
-
-
+ 
 class ExaminationEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -131,60 +142,53 @@ class ExaminationEntryOut(BaseModel):
     value: str
 
 
-# CLINICAL FINDINGS
+
+## CLINICAL FINDINGS ##
 class ClinicalFindingCreate(BaseModel):
     finding_code: str        # from DENTAL_PROBLEM_TAXONOMY
-    finding_name: str        # stored for historical stability
     tooth_numbers: list[int] | None = None
     notes: str | None = None
-
-
-class ClinicalFindingsBulkCreate(BaseModel):
+  
+class ClinicalFindingsBulkCreate(FindingsValidatorMixin, BaseModel):
     """POST /encounters/{id}/findings — send all at once."""
     findings: list[ClinicalFindingCreate]
 
-
 class ClinicalFindingOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    
     finding_code: str
     finding_name: str
+    
     tooth_numbers: list[int] | None
     notes: str | None
 
 
-# DIAGNOSIS
+
+## DIAGNOSIS ##
 class DiagnosisCreate(BaseModel):
-    diagnosis_code: str      # from DENTAL_DIAGNOSIS_TAXONOMY
-    diagnosis_name: str
+    diagnosis_code: str  # validated against DENTAL_DIAGNOSIS_TAXONOMY
+
     icd10_code: str | None = None
+
     is_primary: bool = False
+
     tooth_numbers: list[int] | None = None
+
     notes: str | None = None
-
-
-class DiagnosisBulkCreate(BaseModel):
+    
+class DiagnosisBulkCreate(DiagnosisValidatorMixin, BaseModel):
     """
-    POST /encounters/{id}/diagnoses
-    Exactly one item must have is_primary=True.
-    Validated at the schema level.
+    DiagnosisValidatorMixin validates:
+      1. Every diagnosis_name is in DENTAL_DIAGNOSIS_TAXONOMY
+      2. Exactly one is_primary=True
+    Both checked in one pass, all errors collected before raising.
     """
     diagnoses: list[DiagnosisCreate]
-
-    @model_validator(mode="after")
-    def validate_primary(self) -> "DiagnosisBulkCreate":
-        primary_count = sum(1 for d in self.diagnoses if d.is_primary)
-        if primary_count != 1:
-            raise ValueError(
-                "Exactly one diagnosis must be marked as primary."
-            )
-        return self
 
 
 class DiagnosisUpdate(BaseModel):
     diagnosis_code: str | None = None
-    diagnosis_name: str | None = None
     icd10_code: str | None = None
     is_primary: bool | None = None
     tooth_numbers: list[int] | None = None
@@ -192,26 +196,25 @@ class DiagnosisUpdate(BaseModel):
 
 
 class DiagnosisOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
+
     diagnosis_code: str
     diagnosis_name: str
     icd10_code: str | None
+
     is_primary: bool
+    
     tooth_numbers: list[int] | None
     notes: str | None
 
 
-# INVESTIGATION
+## INVESTIGATION ##
 class InvestigationCreate(BaseModel):
-    investigation_code: str  # from DENTAL_INVESTIGATION_TAXONOMY
-    investigation_name: str
+    investigation_code: str  # validated against DENTAL_INVESTIGATION_TAXONOMY
     notes: str | None = None
 
-
-class InvestigationsBulkCreate(BaseModel):
-    """POST /encounters/{id}/investigations"""
+ 
+class InvestigationsBulkCreate(InvestigationsValidatorMixin, BaseModel):
     investigations: list[InvestigationCreate]
 
 
@@ -219,24 +222,26 @@ class InvestigationResultUpdate(BaseModel):
     """PATCH /encounters/{encounter_id}/investigations/{id}/result"""
     result: str | None = None
     result_file_url: str | None = None
-    status: str  # COMPLETED or CANCELLED
+    status: InvestigationStatusEnum  # COMPLETED or CANCELLED
 
 
 class InvestigationOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    
     investigation_code: str
     investigation_name: str
+    
     status: str
     notes: str | None
     result: str | None
     result_file_url: str | None
+    
     requested_at: datetime
     completed_at: datetime | None
 
 
-# TREATMENT PLAN
+## TREATMENT PLAN ##
 class TreatmentPlanItemCreate(BaseModel):
     procedure_catalog_id: uuid.UUID
     tooth_numbers: list[int] | None = None

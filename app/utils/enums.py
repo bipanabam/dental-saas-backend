@@ -110,6 +110,12 @@ class QueueStatusEnum(str, Enum):
     NO_SHOW = "NO_SHOW"
     CANCELLED = "CANCELLED"
     SKIPPED = "SKIPPED"
+    
+    
+class ProcedureSourceEnum(str, Enum):
+    DIRECT = "DIRECT"
+    TREATMENT_PLAN = "TREATMENT_PLAN"
+    APPOINTMENT_PLAN = "APPOINTMENT_PLAN"
 
 class ProcedureStatusEnum(str, Enum):
     PENDING = "PENDING"
@@ -141,6 +147,7 @@ class TreatmentPlanStatusEnum(str, Enum):
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"  # all items done
     PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"
+    DEFERRED = "DEFERRED"
     CANCELLED = "CANCELLED"
 
 

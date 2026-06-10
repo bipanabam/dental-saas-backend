@@ -39,6 +39,7 @@ def create_access_token(
     *,
     user_id: uuid.UUID,
     tenant_id: uuid.UUID,
+    tenant_slug: str,
     role: str,
 ) -> str:
     """Create a JWT access token with user and tenant information"""
@@ -50,6 +51,7 @@ def create_access_token(
     payload = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id),
+        "tenant_slug": tenant_slug,
         "role": role,
         "type": "access",
         "exp": expire,

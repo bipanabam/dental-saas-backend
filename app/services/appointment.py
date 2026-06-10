@@ -8,13 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.models.appointment import Appointment, AppointmentProcedure
-from app.models.procedure import ProcedureCatalog
 from app.models.queue import Queue
-from app.models.patient import Patient
 from app.models.user import User, Role, Membership
 
 from app.services.shared.services import SharedService
-from app.services.encounter import EncounterService
+from app.services.encounter import EncounterService, EncounterFlowService
 
 from app.schemas.appointment import (
     AppointmentListResponse, 
@@ -34,10 +32,10 @@ from app.schemas.appointment import (
     TodaysAppointmentListItem,
     QueueMini
 )
+from app.schemas.encounter import EncounterCreate
 
 from app.utils.enums import (
-    AppointmentStatusEnum, 
-    RoleEnum, 
+    AppointmentStatusEnum,
     QueueStatusEnum, 
     AppointmentTypeEnum
     )
@@ -887,6 +885,12 @@ class AppointmentWorkflowService:
         AppointmentWorkflowService._ensure_not_completed(
             appointment
         )
+        
+        if appointment.status == AppointmentStatusEnum.CHECKED_IN:
+            raise HTTPException(
+                status_code=status.HTTP_304_NOT_MODIFIED,
+                detail="Appointment already checked in."
+            )
 
         if appointment.status not in [
             AppointmentStatusEnum.BOOKED,
@@ -904,7 +908,7 @@ class AppointmentWorkflowService:
 
         if appointment_day != today:
             raise HTTPException(
-                status_code=400,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     "Only today's appointments "
                     "can be checked in"
@@ -989,8 +993,9 @@ class AppointmentWorkflowService:
             appointment_id=appointment_id,
             doctor_id=appointment.assigned_doctor_id,
             created_by_id=user_id,
-            chief_complaint=appointment.chief_complaint
-            # payload=encounter_payload or EncounterCreate(),
+            payload=EncounterCreate(
+                chief_complaint=appointment.chief_complaint,
+            ),
         )
 
         try:
@@ -1042,23 +1047,19 @@ class AppointmentWorkflowService:
                 ),
             )
             
-        # ── GUARD: requires encounter and primary diagnosis
-        await EncounterService.validate_encounter_for_completion(
+        # GUARD: requires encounter and primary diagnosis
+        from app.services.encounter import EncounterRepository
+        encounter = await EncounterRepository.get_by_appointment_id(
             db=db,
             tenant_id=tenant_id,
             appointment_id=appointment_id,
         )
-        
-        from app.models.encounter import ClinicalEncounter
-        result = await db.execute(
-            select(ClinicalEncounter).where(
-                and_(
-                    ClinicalEncounter.appointment_id == appointment_id,
-                    ClinicalEncounter.tenant_id == tenant_id,
-                )
-            )
+        await EncounterFlowService.close_encounter(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            encounter_id=encounter.id,
         )
-        encounter = result.scalar_one_or_none()
 
         appointment.status = AppointmentStatusEnum.COMPLETED
         appointment.updated_by_id = user_id
@@ -1074,15 +1075,9 @@ class AppointmentWorkflowService:
             appointment.queue_entry.status = (
                 QueueStatusEnum.COMPLETED
             )
-
-            appointment.queue_entry.completed_at = (
-                datetime.now(UTC)
-            )
+            appointment.queue_entry.completed_at = datetime.now(UTC)
             
         # Close encounter: does not commit, caller commits
-        if encounter:
-            await EncounterService.close_encounter(db=db, encounter=encounter)
-
         try:
             await db.commit()
         except SQLAlchemyError as e:
@@ -1095,7 +1090,6 @@ class AppointmentWorkflowService:
             )
 
         await db.refresh(appointment)
-
         return AppointmentListItem.model_validate(
             appointment
         )

@@ -180,3 +180,5 @@ class Procedure(Base, BaseMixin):
         "ProcedureCatalog",
         back_populates="procedures",
     )
+    
+## ProcedureAuditLog table (performed, edited, cancelled, reopened, cost changed, etc.). In a dental EMR, procedure records often become billing records, and audit history becomes extremely valuable for compliance and dispute resolution.

@@ -86,7 +86,10 @@ async def login_for_access_token(
         select(User)
         .options(
             selectinload(User.memberships)
-            .selectinload(Membership.role)
+            .selectinload(Membership.role),
+
+            selectinload(User.memberships)
+            .selectinload(Membership.tenant),
         )
         .where(
             func.lower(User.email) == form_data.username.lower()
@@ -140,6 +143,7 @@ async def login_for_access_token(
     access_token = create_access_token(
         user_id=user.id,
         tenant_id=membership.tenant_id,
+        tenant_slug=membership.tenant.slug,
         role=membership.role.name,
     )
     # Create refresh token
@@ -227,6 +231,7 @@ async def refresh_access_token(
     access_token = create_access_token(
         user_id=user.id,
         tenant_id=membership.tenant_id,
+        tenant_slug=membership.tenant.slug,
         role=membership.role.name,
     )
     refresh_token = create_refresh_token(
