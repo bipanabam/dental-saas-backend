@@ -164,6 +164,7 @@ async def login_for_access_token(
         refresh_token=refresh_token,
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        tenant_slug=membership.tenant.slug, 
     )
     
 # POST -> /auth/refresh
@@ -255,6 +256,7 @@ async def refresh_access_token(
         refresh_token=refresh_token,
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        tenant_slug=membership.tenant.slug, 
     )
     
     

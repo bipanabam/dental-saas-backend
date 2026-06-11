@@ -70,6 +70,10 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
     expires_in: int
+    
+    tenant_slug: str 
+    
+
 class RefreshIn(BaseModel):
     refresh_token: str
 
